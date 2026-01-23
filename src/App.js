@@ -12,6 +12,12 @@ import WhyChooseAlludeAI from "./Pages/WhyUs";
 import ContactUs from "./Pages/ContactUs";
 import AboutAlludeAI from "./Pages/AboutUs";
 import VisitingCardEditor from "./Pages/VisitingCardEditor";
+import BillBooksGrid from "./Pages/BillBooksGrid";
+import SingleBillBook from "./Pages/SingleBillBook";
+import LoginPage from "./Pages/LoginPage";
+import RegisterPage from "./Pages/RegisterPage";
+import EmptyCartPage from "./Pages/EmptyCartPage";
+import WishlistPage from "./Pages/WishlistPage";
 
 function App() {
   return (
@@ -24,6 +30,12 @@ function App() {
         <Route path="/contactus" element={<ContactUs />} />
         <Route path="/aboutus" element={<AboutAlludeAI />} />
          <Route path="/visitingcards" element={<VisitingCardEditor />} />
+        <Route path="/billbooks" element={<BillBooksGrid />} />
+        <Route path="/bill-books/:id" element={<SingleBillBook />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/cart" element={<EmptyCartPage />} />
+        <Route path="/wishlist" element={<WishlistPage />} />
       </Routes>
     </Router>
   );

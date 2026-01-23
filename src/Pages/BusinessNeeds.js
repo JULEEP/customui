@@ -1,6 +1,9 @@
 import React from "react";
+import { useNavigate } from "react-router-dom";
 
 const BusinessNeedsExact = () => {
+  const navigate = useNavigate();
+  
   const imageUrl = "https://cdn.printshoppy.com/image/catalog/v9/webp/home-page/regular/home-page-office-stationery-prescription-pads.webp";
 
   const products = [
@@ -16,6 +19,13 @@ const BusinessNeedsExact = () => {
     { name: "Name Pencils", price: "From ₹149/- Each Pack*" }
   ];
 
+  const handleProductClick = (productName) => {
+    if (productName === "Bill Books") {
+      navigate("/billbooks");
+    }
+    // Add other product navigations here if needed
+  };
+
   return (
     <div className="py-12 px-4 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto">
@@ -25,9 +35,15 @@ const BusinessNeedsExact = () => {
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
           {products.map((product, index) => (
-            <div key={index} className="group">
+            <div 
+              key={index} 
+              className="group"
+              onClick={() => handleProductClick(product.name)}
+            >
               {/* Card with exact PrintShoppy image style */}
-              <div className="bg-white rounded-2xl p-5 border border-gray-300 shadow-sm hover:shadow-xl transition-all duration-300">
+              <div className={`bg-white rounded-2xl p-5 border border-gray-300 shadow-sm hover:shadow-xl transition-all duration-300 ${
+                product.name === "Bill Books" ? "cursor-pointer hover:border-blue-500" : ""
+              }`}>
                 
                 {/* Image container like PrintShoppy */}
                 <div className="mb-4 h-56 bg-gradient-to-br from-blue-50 to-gray-100 rounded-xl overflow-hidden relative">

@@ -8,6 +8,7 @@ import PhotoAlbumsPrints from "./PhotoAlbumsPrints";
 import BusinessNeeds from "./BusinessNeeds";
 import GiftBanner from "./GiftBanner";
 import VisionHomegrownSection from "./VisionHomegrownSection";
+import BannerSliderPage from "./BannerSliderPage";
 
 const HomePage = () => {
   return (
@@ -18,7 +19,8 @@ const HomePage = () => {
       </div>
       
       {/* Main Content - NOT fixed */}
-      <div className="pt-20"> {/* pt-20 for navbar height */}
+      <div className="pt-20 mt-8"> {/* pt-20 for navbar height */}
+        <BannerSliderPage />
         <PrintShoppySearch />
         <SimplePopularProducts />
         <NewInProducts />
