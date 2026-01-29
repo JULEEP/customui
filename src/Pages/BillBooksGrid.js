@@ -1,105 +1,61 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 
 const BillBooksGrid = () => {
   const navigate = useNavigate();
+  const [billBooks, setBillBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   
-  // Single image for all bill books
-  const defaultImage = "https://cdn.printshoppy.com/image/catalog/v9/webp/home-page/regular/home-page-office-stationery-prescription-pads.webp";
-  
-  // Sample bill books data with SAME image
-  const billBooks = [
-    {
-      id: 1,
-      name: "Premium Carbon Copy Bill Book",
-      price: "₹850/-",
-      description: "3 copies with carbon paper, size A5",
-      image: defaultImage,
-      colors: ["Blue", "Green", "Red"],
-      pages: 100
-    },
-    {
-      id: 2,
-      name: "Duplicate Bill Book - NCR",
-      price: "₹950/-",
-      description: "No Carbon Required, self-copying",
-      image: defaultImage,
-      colors: ["White", "Yellow", "Pink"],
-      pages: 150
-    },
-    {
-      id: 3,
-      name: "Triplicate Bill Book",
-      price: "₹1200/-",
-      description: "Original + 2 copies, bound with spiral",
-      image: defaultImage,
-      colors: ["All Colors"],
-      pages: 200
-    },
-    {
-      id: 4,
-      name: "Pocket Bill Book",
-      price: "₹650/-",
-      description: "Small size, portable, 50 bills",
-      image: defaultImage,
-      colors: ["Blue", "Black"],
-      pages: 50
-    },
-    {
-      id: 5,
-      name: "Custom Logo Bill Book",
-      price: "₹1500/-",
-      description: "Custom design with your logo",
-      image: defaultImage,
-      colors: ["Custom"],
-      pages: 100
-    },
-    {
-      id: 6,
-      name: "Professional Invoice Book",
-      price: "₹1100/-",
-      description: "Professional invoices with serial numbers",
-      image: defaultImage,
-      colors: ["White", "Blue"],
-      pages: 120
-    },
-    {
-      id: 7,
-      name: "Receipt Book - Carbonless",
-      price: "₹750/-",
-      description: "Carbonless duplicate receipts",
-      image: defaultImage,
-      colors: ["White", "Green"],
-      pages: 80
-    },
-    {
-      id: 8,
-      name: "Delivery Challan Book",
-      price: "₹900/-",
-      description: "Delivery notes with duplicate",
-      image: defaultImage,
-      colors: ["White", "Yellow"],
-      pages: 100
-    },
-    {
-      id: 9,
-      name: "Thermal Bill Book",
-      price: "₹1800/-",
-      description: "Thermal paper, no ink needed",
-      image: defaultImage,
-      colors: ["White"],
-      pages: 200
-    },
-    {
-      id: 10,
-      name: "Waterproof Bill Book",
-      price: "₹1350/-",
-      description: "Water and tear resistant",
-      image: defaultImage,
-      colors: ["Blue", "White"],
-      pages: 100
+  // API base URL
+  const API_BASE_URL = "https://designback.onrender.com";
+
+  useEffect(() => {
+    fetchBillBooks();
+  }, []);
+
+  const fetchBillBooks = async () => {
+    try {
+      setLoading(true);
+      const response = await fetch(`${API_BASE_URL}/api/admin/allbillbooks`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const result = await response.json();
+      
+      if (result.success) {
+        // Transform API data to match component structure
+        const transformedData = result.data.map(book => ({
+          id: book._id,
+          name: book.name,
+          // Handle image path - convert backslashes to forward slashes and prepend base URL
+          image: `${API_BASE_URL}/${book.file.replace(/\\/g, '/')}`,
+          // Generate price based on text elements count or use default
+          price: `₹${(book.textElements?.length * 100 + 500)}/-`,
+          // Use description from text elements or default
+          description: book.textElements?.find(t => t.text.includes("Description"))?.text || 
+                      book.textElements?.[0]?.text || 
+                      "Custom bill book with multiple text elements",
+          // Generate colors array based on text element colors
+          colors: [...new Set(book.textElements?.map(t => t.color).slice(0, 3) || [])]
+                  .map(color => color || "Default"),
+          // Calculate pages based on text elements count
+          pages: Math.max(50, book.textElements?.length * 20)
+        }));
+        
+        setBillBooks(transformedData);
+      } else {
+        throw new Error("Failed to fetch bill books");
+      }
+    } catch (err) {
+      console.error("Error fetching bill books:", err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
 
   const handleCardClick = (id) => {
     navigate(`/bill-books/${id}`);
@@ -108,6 +64,98 @@ const BillBooksGrid = () => {
   const handleBackClick = () => {
     navigate("/");
   };
+
+  // Loading state
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-10">
+            <button
+              onClick={handleBackClick}
+              className="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+            >
+              ← Back to Business Needs
+            </button>
+            <h1 className="text-4xl font-bold text-gray-900 text-center">
+              Bill Books Collection
+            </h1>
+            <div className="w-32"></div>
+          </div>
+          <div className="flex justify-center items-center h-96">
+            <div className="text-center">
+              <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
+              <p className="text-gray-600">Loading bill books...</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-10">
+            <button
+              onClick={handleBackClick}
+              className="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+            >
+              ← Back to Business Needs
+            </button>
+            <h1 className="text-4xl font-bold text-gray-900 text-center">
+              Bill Books Collection
+            </h1>
+            <div className="w-32"></div>
+          </div>
+          <div className="flex justify-center items-center h-96">
+            <div className="text-center bg-red-50 p-8 rounded-xl border border-red-200 max-w-md">
+              <div className="text-red-500 text-4xl mb-4">⚠️</div>
+              <h3 className="text-xl font-bold text-gray-900 mb-2">Error Loading Bill Books</h3>
+              <p className="text-gray-600 mb-4">{error}</p>
+              <button
+                onClick={fetchBillBooks}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (billBooks.length === 0) {
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-center mb-10">
+            <button
+              onClick={handleBackClick}
+              className="flex items-center text-blue-600 hover:text-blue-800 font-medium"
+            >
+              ← Back to Business Needs
+            </button>
+            <h1 className="text-4xl font-bold text-gray-900 text-center">
+              Bill Books Collection
+            </h1>
+            <div className="w-32"></div>
+          </div>
+          <div className="flex justify-center items-center h-96">
+            <div className="text-center">
+              <div className="text-gray-400 text-6xl mb-4">📋</div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-2">No Bill Books Available</h3>
+              <p className="text-gray-600">No bill books have been created yet.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4">
@@ -122,6 +170,9 @@ const BillBooksGrid = () => {
           </button>
           <h1 className="text-4xl font-bold text-gray-900 text-center">
             Bill Books Collection
+            <span className="block text-lg font-normal text-gray-600 mt-2">
+              {billBooks.length} {billBooks.length === 1 ? 'item' : 'items'} available
+            </span>
           </h1>
           <div className="w-32"></div> {/* For spacing */}
         </div>
@@ -141,6 +192,10 @@ const BillBooksGrid = () => {
                     src={book.image}
                     alt={book.name}
                     className="max-h-full max-w-full object-contain drop-shadow-lg"
+                    onError={(e) => {
+                      // Fallback image if the image fails to load
+                      e.target.src = "https://cdn.printshoppy.com/image/catalog/v9/webp/home-page/regular/home-page-office-stationery-prescription-pads.webp";
+                    }}
                   />
                 </div>
                 
@@ -166,14 +221,24 @@ const BillBooksGrid = () => {
                   </span>
                 </div>
                 <div className="mt-2 flex flex-wrap justify-center gap-1">
-                  {book.colors.map((color, idx) => (
-                    <span
-                      key={idx}
-                      className="text-xs px-2 py-1 bg-gray-100 rounded-full"
-                    >
-                      {color}
+                  {book.colors.length > 0 ? (
+                    book.colors.map((color, idx) => (
+                      <span
+                        key={idx}
+                        className="text-xs px-2 py-1 bg-gray-100 rounded-full"
+                        style={{ 
+                          backgroundColor: color.startsWith('#') ? `${color}20` : undefined,
+                          color: color.startsWith('#') ? color : undefined
+                        }}
+                      >
+                        {color.startsWith('#') ? `Color ${idx + 1}` : color}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs px-2 py-1 bg-gray-100 rounded-full">
+                      Custom Colors
                     </span>
-                  ))}
+                  )}
                 </div>
               </div>
 
@@ -194,8 +259,8 @@ const BillBooksGrid = () => {
                 <span className="text-blue-600 font-bold">✓</span>
               </div>
               <div>
-                <h4 className="font-bold text-gray-900">High Quality Paper</h4>
-                <p className="text-gray-600">GSM paper for durability</p>
+                <h4 className="font-bold text-gray-900">Fully Customizable</h4>
+                <p className="text-gray-600">Add custom text, logos, and colors</p>
               </div>
             </div>
             <div className="flex items-start">
@@ -203,8 +268,8 @@ const BillBooksGrid = () => {
                 <span className="text-blue-600 font-bold">✓</span>
               </div>
               <div>
-                <h4 className="font-bold text-gray-900">Custom Printing</h4>
-                <p className="text-gray-600">Add your logo and details</p>
+                <h4 className="font-bold text-gray-900">Multiple Text Elements</h4>
+                <p className="text-gray-600">Add unlimited text fields</p>
               </div>
             </div>
             <div className="flex items-start">
@@ -212,8 +277,8 @@ const BillBooksGrid = () => {
                 <span className="text-blue-600 font-bold">✓</span>
               </div>
               <div>
-                <h4 className="font-bold text-gray-900">Fast Delivery</h4>
-                <p className="text-gray-600">Across India in 5-7 days</p>
+                <h4 className="font-bold text-gray-900">Professional Templates</h4>
+                <p className="text-gray-600">Pre-designed for business needs</p>
               </div>
             </div>
           </div>
