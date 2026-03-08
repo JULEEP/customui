@@ -118,12 +118,36 @@ const BusinessNeedsExact = () => {
     // Add other product navigations here if needed
   };
 
+  const handleBannerClick = () => {
+    navigate("/flex-items");
+  };
+
   return (
     <div className="py-12 px-4 bg-gradient-to-b from-gray-50 to-white">
       <div className="max-w-7xl mx-auto">
         <h2 className="text-3xl font-bold text-gray-900 text-center mb-10">
           BUSINESS NEEDS
         </h2>
+
+        {/* Banner Section - Flex Items */}
+        <div 
+          className="mb-12 cursor-pointer transform hover:scale-105 transition-transform duration-300"
+          onClick={handleBannerClick}
+        >
+          <div className="relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow">
+            <img
+              src="https://trbahadurpur.com/wp-content/uploads/2023/05/SCHOOL-BANNER-10052023.jpg"
+              alt="School Banner - Alpha Education Centre"
+              className="w-full h-auto object-cover"
+            />
+            {/* Overlay with click indicator */}
+            <div className="absolute inset-0 bg-black/20 hover:bg-black/10 transition-colors flex items-center justify-center">
+              <div className="bg-white/90 text-gray-900 px-6 py-3 rounded-full font-bold text-lg shadow-lg">
+                Click to View All Flex Items →
+              </div>
+            </div>
+          </div>
+        </div>
 
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
           {products.map((product, index) => (

@@ -1,12 +1,31 @@
+// SingleBillBook.jsx - Updated with more fields
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
-import { FaStar, FaShippingFast, FaUndo, FaRupeeSign, FaGoogle, FaSave, FaSpinner } from "react-icons/fa";
+import { 
+  FaStar, FaShippingFast, FaUndo, FaRupeeSign, FaGoogle, 
+  FaSave, FaSpinner, FaShoppingCart, FaArrowRight, FaGift,
+  FaCheckCircle, FaTruck, FaShieldAlt, FaHeart, FaBuilding,
+  FaMapMarkerAlt, FaPhone, FaEnvelope, FaFileInvoice, FaTag
+} from "react-icons/fa";
+import { toast, Toaster } from 'react-hot-toast';
 
 const SingleBillBook = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  
+  // Customer Details State - Expanded with more fields
+  const [customerDetails, setCustomerDetails] = useState({
+    companyName: "",
+    address: "",
+    mobile: "",
+    alternateMobile: "", // Additional field
+    email: "",
+    gstNo: "", // Changed from gstin to gstNo
+    description: "" // New field for order description/notes
+  });
+  
   const [quantity, setQuantity] = useState(1);
   const [selectedBillBook, setSelectedBillBook] = useState("");
   const [selectedBillBookType, setSelectedBillBookType] = useState("");
@@ -19,10 +38,7 @@ const SingleBillBook = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [imageError, setImageError] = useState(false);
-  const [editingFields, setEditingFields] = useState({});
-  const [saving, setSaving] = useState(false);
-  const [saveMessage, setSaveMessage] = useState("");
-  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [isAddingToCart, setIsAddingToCart] = useState(false);
 
   const API_BASE_URL = "https://designback.onrender.com";
 
@@ -43,13 +59,6 @@ const SingleBillBook = () => {
       
       if (result.success) {
         setBillBook(result.data);
-        const initialFields = {};
-        if (result.data.textElements) {
-          result.data.textElements.forEach((element, index) => {
-            initialFields[index] = element.text;
-          });
-        }
-        setEditingFields(initialFields);
       } else {
         throw new Error("Failed to fetch bill book");
       }
@@ -58,61 +67,6 @@ const SingleBillBook = () => {
       setError(err.message);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const updateBillBook = async () => {
-    try {
-      setSaving(true);
-      setSaveMessage("");
-      setSaveSuccess(false);
-
-      // Prepare updated text elements
-      const updatedTextElements = billBook.textElements.map((element, index) => ({
-        ...element,
-        text: editingFields[index] || element.text
-      }));
-
-      // Call update API
-      const response = await fetch(`${API_BASE_URL}/api/admin/billbook/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          textElements: updatedTextElements,
-          isEdited: true
-        })
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        setSaveSuccess(true);
-        setSaveMessage(result.message);
-        
-        // Update local state with new data
-        setBillBook(result.data);
-        
-        // Clear message after 3 seconds
-        setTimeout(() => {
-          setSaveMessage("");
-          setSaveSuccess(false);
-        }, 3000);
-      } else {
-        throw new Error(result.message || "Failed to update bill book");
-      }
-    } catch (err) {
-      console.error("Error updating bill book:", err);
-      setSaveSuccess(false);
-      setSaveMessage(`Error: ${err.message}`);
-      
-      // Clear error message after 5 seconds
-      setTimeout(() => {
-        setSaveMessage("");
-      }, 5000);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -154,8 +108,83 @@ const SingleBillBook = () => {
     navigate("/bill-books");
   };
 
+  const handleCustomerDetailsChange = (e) => {
+    const { name, value } = e.target;
+    setCustomerDetails(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
   const handleAddToCart = () => {
-    alert(`Added ${quantity} ${billBook?.name} to cart!`);
+    // Validate required fields
+    if (!customerDetails.companyName || !customerDetails.address || !customerDetails.mobile) {
+      toast.error("Please fill in Company Name, Address, and Mobile Number");
+      return;
+    }
+
+    if (customerDetails.mobile.length !== 10) {
+      toast.error("Please enter a valid 10-digit mobile number");
+      return;
+    }
+
+    if (customerDetails.alternateMobile && customerDetails.alternateMobile.length !== 10) {
+      toast.error("Please enter a valid 10-digit alternate mobile number");
+      return;
+    }
+
+    setIsAddingToCart(true);
+
+    // Create cart item with all fields
+    const cartItem = {
+      id: Date.now(), // Unique ID for cart item
+      productId: billBook._id,
+      name: billBook.name,
+      image: getImageUrl(),
+      quantity: quantity,
+      price: calculatePrice(),
+      customerDetails: {
+        companyName: customerDetails.companyName,
+        address: customerDetails.address,
+        mobile: customerDetails.mobile,
+        alternateMobile: customerDetails.alternateMobile,
+        email: customerDetails.email,
+        gstNo: customerDetails.gstNo,
+        description: customerDetails.description
+      },
+      selectedOptions: {
+        billBook: selectedBillBook,
+        billBookType: selectedBillBookType,
+        bookContains: selectedBookContains,
+        paperType: selectedPaperType,
+        serialNumber: selectedSerialNumber
+      },
+      timestamp: new Date().toISOString()
+    };
+
+    // Get existing cart from localStorage or initialize empty array
+    const existingCart = JSON.parse(localStorage.getItem('cart')) || [];
+    
+    // Add new item
+    existingCart.push(cartItem);
+    
+    // Save to localStorage
+    localStorage.setItem('cart', JSON.stringify(existingCart));
+
+    // Show success message
+    toast.success("Item added to cart successfully!");
+    
+    setIsAddingToCart(false);
+
+    // Navigate to cart after short delay
+    setTimeout(() => {
+      navigate("/cart");
+    }, 1500);
+  };
+
+  const calculatePrice = () => {
+    const basePrice = billBook?.textElements ? billBook.textElements.length * 100 + 500 : 750;
+    return basePrice * quantity;
   };
 
   const incrementQuantity = () => setQuantity(prev => prev + 1);
@@ -167,6 +196,8 @@ const SingleBillBook = () => {
       setTimeout(() => {
         setShowDeliveryCheck(false);
       }, 3000);
+    } else {
+      toast.error("Please enter a valid 6-digit pincode");
     }
   };
 
@@ -190,9 +221,14 @@ const SingleBillBook = () => {
       description: "We Provide 30 days hassle free returns & refunds."
     },
     {
-      icon: <FaRupeeSign className="text-2xl text-yellow-600" />,
-      title: "10% CASHBACK",
-      description: "With every order placed, you'll receive 10% cashback"
+      icon: <FaShieldAlt className="text-2xl text-purple-600" />,
+      title: "QUALITY GUARANTEE",
+      description: "100% satisfaction guaranteed with premium quality"
+    },
+    {
+      icon: <FaHeart className="text-2xl text-red-600" />,
+      title: "CUSTOM DESIGN",
+      description: "Personalized just the way you want it"
     }
   ];
 
@@ -201,15 +237,11 @@ const SingleBillBook = () => {
     
     const filePath = billBook.file;
     
-    // Check if it's already a full URL
     if (filePath.startsWith('http')) {
       return filePath;
     }
     
-    // Handle different path formats
     const cleanPath = filePath.replace(/\\/g, '/');
-    
-    // Remove leading slash if present
     const normalizedPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
     
     return `${API_BASE_URL}/${normalizedPath}`;
@@ -219,27 +251,14 @@ const SingleBillBook = () => {
     setImageError(true);
   };
 
-  const handleFieldChange = (index, value) => {
-    setEditingFields(prev => ({
-      ...prev,
-      [index]: value
-    }));
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
         <Navbar />
-        <div className="mt-22">
-          <div className="py-8 px-4 mt-8">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex justify-center items-center h-96">
-                <div className="text-center">
-                  <div className="inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500 mb-4"></div>
-                  <p className="text-gray-600">Loading bill book details...</p>
-                </div>
-              </div>
-            </div>
+        <div className="flex justify-center items-center h-screen">
+          <div className="text-center">
+            <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
+            <p className="text-gray-600">Loading bill book details...</p>
           </div>
         </div>
         <Footer />
@@ -251,23 +270,17 @@ const SingleBillBook = () => {
     return (
       <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
         <Navbar />
-        <div className="mt-22">
-          <div className="py-8 px-4 mt-8">
-            <div className="max-w-7xl mx-auto">
-              <div className="flex justify-center items-center h-96">
-                <div className="text-center bg-red-50 p-8 rounded-xl border border-red-200 max-w-md">
-                  <div className="text-red-500 text-4xl mb-4">⚠️</div>
-                  <h3 className="text-xl font-bold text-gray-900 mb-2">Error Loading Bill Book</h3>
-                  <p className="text-gray-600 mb-4">{error || "Bill book not found"}</p>
-                  <button
-                    onClick={handleBackClick}
-                    className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-                  >
-                    Back to Bill Books
-                  </button>
-                </div>
-              </div>
-            </div>
+        <div className="flex justify-center items-center h-screen">
+          <div className="text-center bg-red-50 p-8 rounded-xl border border-red-200 max-w-md">
+            <div className="text-red-500 text-4xl mb-4">⚠️</div>
+            <h3 className="text-xl font-bold text-gray-900 mb-2">Error Loading Bill Book</h3>
+            <p className="text-gray-600 mb-4">{error || "Bill book not found"}</p>
+            <button
+              onClick={handleBackClick}
+              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+            >
+              Back to Bill Books
+            </button>
           </div>
         </div>
         <Footer />
@@ -277,381 +290,380 @@ const SingleBillBook = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <Toaster position="top-center" />
       <Navbar />
 
-      <div className="mt-22">
-        <div className="py-8 px-4 mt-8">
-          <div className="max-w-7xl mx-auto">
-            {/* Back button */}
-            <button
-              onClick={handleBackClick}
-              className="flex items-center text-blue-600 hover:text-blue-800 font-medium mb-6 group"
-            >
-              <span className="mr-2 transform group-hover:-translate-x-1 transition-transform">←</span>
-              Back to Bill Books
-            </button>
+      <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Back button */}
+          <button
+            onClick={handleBackClick}
+            className="flex items-center text-blue-600 hover:text-blue-800 font-medium mb-6 group"
+          >
+            <span className="mr-2 transform group-hover:-translate-x-1 transition-transform">←</span>
+            Back to Bill Books
+          </button>
 
-            {/* Save Message */}
-            {saveMessage && (
-              <div className={`mb-6 p-4 rounded-xl border ${saveSuccess ? 'bg-green-50 text-green-700 border-green-200' : 'bg-red-50 text-red-700 border-red-200'}`}>
-                <div className="flex items-center">
-                  {saveSuccess ? (
-                    <span className="mr-3 text-green-500">✓</span>
-                  ) : (
-                    <span className="mr-3 text-red-500">⚠</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Left Column - Image */}
+            <div className="space-y-6">
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
+                <h1 className="text-2xl font-bold text-gray-900 mb-4 text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  {billBook.name}
+                </h1>
+                
+                <div className="relative bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 mb-4 min-h-[400px] flex items-center justify-center border-2 border-gray-200 group">
+                  <img
+                    src={getImageUrl()}
+                    alt={billBook.name}
+                    className="max-h-[350px] max-w-full object-contain transform group-hover:scale-105 transition-transform duration-500"
+                    onError={handleImageError}
+                  />
+                  {billBook?.isEdited && (
+                    <div className="absolute top-4 left-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center">
+                      <FaCheckCircle className="mr-1" /> CUSTOMIZED
+                    </div>
                   )}
-                  <span>{saveMessage}</span>
                 </div>
               </div>
-            )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              {/* Left Column - Image with Editable Fields */}
-              <div>
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-6">
-                  {/* Title */}
-                  <h1 className="text-3xl font-bold text-gray-900 mb-6 text-center">BILL BOOK / INVOICE DESIGNS</h1>
-                  
-                  {/* Main Image - BADA */}
-                  <div className="relative bg-white rounded-2xl p-4 mb-8 min-h-[600px] flex items-center justify-center overflow-hidden border border-gray-300">
-                    <img
-                      src={getImageUrl()}
-                      alt={billBook.name}
-                      className="max-h-[550px] max-w-full object-contain"
-                      onError={handleImageError}
-                      key={billBook?.file} // Key forces re-render when image changes
-                    />
-                    {billBook?.isEdited && (
-                      <div className="absolute top-4 left-4 bg-blue-500 text-white text-xs font-bold px-3 py-1 rounded-full">
-                        ✓ EDITED
-                      </div>
-                    )}
-                  </div>
-                  
-                  {/* Editable Fields */}
-                  <div className="space-y-4 mb-6">
-                    {billBook.textElements && billBook.textElements.map((element, index) => (
-                      <div key={element.id} className="mb-4">
-                        <div className="flex items-center mb-2">
-                          <span className="text-sm font-semibold text-gray-700 bg-gray-100 px-3 py-1 rounded-lg">
-                            Field {index + 1}
-                          </span>
-                          <div className="ml-4 text-xs text-gray-500">
-                            Font: {element.fontFamily}, Size: {element.fontSize}px, 
-                            Color: <span className="inline-block w-3 h-3 rounded-full ml-1" style={{ backgroundColor: element.color }}></span>
-                            {element.isBold && <span className="ml-2 font-bold">Bold</span>}
-                            {element.isItalic && <span className="ml-2 italic">Italic</span>}
-                            {element.isUnderline && <span className="ml-2 underline">Underline</span>}
-                          </div>
-                        </div>
-                        <input
-                          type="text"
-                          value={editingFields[index] || element.text}
-                          onChange={(e) => handleFieldChange(index, e.target.value)}
-                          className="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                          placeholder={`Edit text for field ${index + 1}`}
-                        />
-                      </div>
+              {/* Reviews Section */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
+                <div className="flex items-center mb-4">
+                  <FaGoogle className="text-blue-600 mr-3 text-xl" />
+                  <h3 className="text-lg font-bold text-gray-900">Customer Reviews</h3>
+                </div>
+                <div className="flex items-center mb-3">
+                  <div className="flex">
+                    {[...Array(5)].map((_, i) => (
+                      <FaStar key={i} className="text-yellow-400 w-5 h-5" />
                     ))}
-                    
-                    {/* Save Button */}
-                    <div className="mt-8 pt-6 border-t border-gray-200">
-                      <button
-                        onClick={updateBillBook}
-                        disabled={saving}
-                        className={`w-full py-4 ${
-                          saving 
-                            ? 'bg-gray-500 cursor-not-allowed' 
-                            : 'bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'
-                        } text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center text-lg group`}
-                      >
-                        {saving ? (
-                          <>
-                            <FaSpinner className="animate-spin mr-3" />
-                            SAVING...
-                          </>
-                        ) : (
-                          <>
-                            <FaSave className="mr-3" />
-                            SAVE CHANGES
-                            <span className="ml-3 transform group-hover:translate-x-1 transition-transform">→</span>
-                          </>
-                        )}
-                      </button>
-                      <p className="text-xs text-gray-500 text-center mt-2">
-                        Click to save all text field changes to the database.
-                      </p>
-                    </div>
                   </div>
-                  
-                  {/* Reviews Section */}
-                  <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
-                    <div className="flex items-center mb-4">
-                      <FaGoogle className="text-blue-600 mr-3 text-xl" />
-                      <h3 className="text-lg font-bold text-gray-900">Our Customer Reviews On Google</h3>
-                    </div>
-                    <div className="flex items-center mb-3">
-                      <div className="flex">
-                        {[...Array(5)].map((_, i) => (
-                          <FaStar key={i} className="text-yellow-400 w-5 h-5" />
-                        ))}
-                      </div>
-                      <span className="ml-2 font-bold text-gray-900 text-xl">4.4</span>
-                      <span className="ml-2 text-gray-600 text-lg">(57042+)</span>
-                    </div>
+                  <span className="ml-2 font-bold text-gray-900 text-xl">4.4</span>
+                  <span className="ml-2 text-gray-600 text-lg">(57042+ reviews)</span>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="text-center p-2 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Premium Quality</p>
+                  </div>
+                  <div className="text-center p-2 bg-gray-50 rounded-lg">
+                    <p className="text-sm text-gray-600">Fast Delivery</p>
                   </div>
                 </div>
               </div>
+            </div>
 
-              {/* Right Column - Configuration Options */}
-              <div>
-                {/* Price Card */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-6">
-                  <div className="text-center mb-6">
-                    <h1 className="text-2xl font-bold text-gray-900 mb-2">{billBook.name}</h1>
-                    <div className="text-4xl font-bold text-gray-900 mb-1">
-                      ₹{billBook.textElements ? billBook.textElements.length * 100 + 500 : 750}/-
+            {/* Right Column - Configuration */}
+            <div className="space-y-6">
+              {/* Customer Details Form - Enhanced with more fields */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-blue-600 font-bold">1</span>
+                  </span>
+                  Enter Your Details
+                </h2>
+                
+                <div className="space-y-4">
+                  {/* Company Name */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <FaBuilding className="mr-2 text-blue-600" />
+                      Company Name <span className="text-red-500 ml-1">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      name="companyName"
+                      value={customerDetails.companyName}
+                      onChange={handleCustomerDetailsChange}
+                      placeholder="Enter your company name"
+                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  {/* Address */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <FaMapMarkerAlt className="mr-2 text-red-600" />
+                      Address <span className="text-red-500 ml-1">*</span>
+                    </label>
+                    <textarea
+                      name="address"
+                      value={customerDetails.address}
+                      onChange={handleCustomerDetailsChange}
+                      placeholder="Enter your full address"
+                      rows="3"
+                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  {/* Mobile Numbers */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                        <FaPhone className="mr-2 text-green-600" />
+                        Mobile <span className="text-red-500 ml-1">*</span>
+                      </label>
+                      <input
+                        type="tel"
+                        name="mobile"
+                        value={customerDetails.mobile}
+                        onChange={handleCustomerDetailsChange}
+                        placeholder="10-digit mobile"
+                        maxLength="10"
+                        className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
                     </div>
-                    <div className="flex items-center justify-center text-green-600 font-semibold">
-                      <FaShippingFast className="mr-2" />
-                      Free Shipping
+                    
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                        <FaPhone className="mr-2 text-purple-600" />
+                        Alternate Mobile
+                      </label>
+                      <input
+                        type="tel"
+                        name="alternateMobile"
+                        value={customerDetails.alternateMobile}
+                        onChange={handleCustomerDetailsChange}
+                        placeholder="Alternate number"
+                        maxLength="10"
+                        className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
                     </div>
                   </div>
                   
-                  {/* Free Gift Banner */}
-                  <div className="bg-gradient-to-r from-purple-500 via-pink-500 to-red-500 text-white p-4 rounded-xl mb-6">
-                    <div className="font-bold text-xl mb-1">FREE GIFT WORTH ₹299</div>
-                    <div className="text-sm mb-2">Limited time offer!</div>
-                    <div className="flex items-center text-xs">
-                      <div className="flex-1 bg-white/30 h-1 rounded-full overflow-hidden">
-                        <div className="bg-yellow-400 h-full" style={{ width: '75%' }}></div>
-                      </div>
-                      <span className="ml-2 font-bold">127 gifts left today</span>
+                  {/* Email and GST */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                        <FaEnvelope className="mr-2 text-yellow-600" />
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        name="email"
+                        value={customerDetails.email}
+                        onChange={handleCustomerDetailsChange}
+                        placeholder="Email address"
+                        className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      />
                     </div>
-                  </div>
-
-                  {/* Step Process */}
-                  <div className="mb-6">
-                    <div className="flex mb-3">
-                      <div className="w-1/2 pr-2">
-                        <button className="w-full py-4 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-bold rounded-l-xl rounded-r-lg relative">
-                          <div className="absolute -top-2 -left-2 bg-blue-700 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center">
-                            1
-                          </div>
-                          <div className="text-lg">Add to cart</div>
-                          <div className="text-sm opacity-90">Step - 1</div>
-                        </button>
-                      </div>
-                      <div className="w-1/2 pl-2">
-                        <button className="w-full py-4 bg-gradient-to-r from-purple-500 to-purple-600 text-white font-bold rounded-r-xl rounded-l-lg relative opacity-80">
-                          <div className="absolute -top-2 -left-2 bg-purple-700 text-white text-xs w-6 h-6 rounded-full flex items-center justify-center">
-                            2
-                          </div>
-                          <div className="text-lg">Pick gift</div>
-                          <div className="text-sm opacity-90">Step - 2</div>
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Quantity Selector */}
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-3">
-                      <span className="font-semibold text-gray-700">Quantity:</span>
-                      <span className="text-xl font-bold text-gray-900">{quantity}</span>
-                    </div>
-                    <div className="flex items-center bg-gray-50 rounded-xl p-1">
-                      <button
-                        onClick={decrementQuantity}
-                        className="w-12 h-12 bg-white rounded-l-lg flex items-center justify-center text-2xl font-bold text-gray-700 hover:bg-gray-100 border border-gray-300"
-                      >
-                        -
-                      </button>
-                      <div className="flex-1 h-12 flex items-center justify-center font-bold text-lg">
-                        {quantity} {quantity === 1 ? 'Book' : 'Books'}
-                      </div>
-                      <button
-                        onClick={incrementQuantity}
-                        className="w-12 h-12 bg-white rounded-r-lg flex items-center justify-center text-2xl font-bold text-gray-700 hover:bg-gray-100 border border-gray-300"
-                      >
-                        +
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Add to Cart Button */}
-                  <button
-                    onClick={handleAddToCart}
-                    className="w-full py-4 bg-gradient-to-r from-green-500 to-emerald-600 text-white font-bold rounded-xl hover:from-green-600 hover:to-emerald-700 transition-all shadow-lg mb-6 flex items-center justify-center text-lg group"
-                  >
-                    <span className="mr-3">🛒</span>
-                    ADD TO CART
-                    <span className="ml-3 transform group-hover:translate-x-1 transition-transform">→</span>
-                  </button>
-
-                  {/* Delivery Check */}
-                  <div className="border-t border-gray-200 pt-6">
-                    <h3 className="font-semibold text-gray-700 mb-3">Check Delivery</h3>
-                    <p className="text-sm text-gray-600 mb-3">Enter your pincode to check delivery availability.</p>
-                    <div className="flex">
+                    
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                        <FaFileInvoice className="mr-2 text-indigo-600" />
+                        GST No.
+                      </label>
                       <input
                         type="text"
-                        value={pincode}
-                        onChange={(e) => setPincode(e.target.value)}
-                        placeholder="Enter Pincode"
-                        className="flex-1 p-3 border-2 border-gray-300 rounded-l-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                        maxLength="6"
+                        name="gstNo"
+                        value={customerDetails.gstNo}
+                        onChange={handleCustomerDetailsChange}
+                        placeholder="Enter GST number"
+                        className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                       />
-                      <button
-                        onClick={handleCheckDelivery}
-                        className="px-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-r-lg hover:from-blue-600 hover:to-blue-700"
-                      >
-                        Check
-                      </button>
                     </div>
-                    {showDeliveryCheck && (
-                      <div className="mt-3 p-3 bg-green-50 text-green-700 rounded-lg border border-green-200 flex items-center">
-                        <span className="mr-2">✅</span>
-                        Delivery available to your pincode within 5-7 days
-                      </div>
-                    )}
+                  </div>
+
+                  {/* Description/Notes */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                      <FaTag className="mr-2 text-pink-600" />
+                      Description / Special Instructions
+                    </label>
+                    <textarea
+                      name="description"
+                      value={customerDetails.description}
+                      onChange={handleCustomerDetailsChange}
+                      placeholder="Any special instructions or notes for your order..."
+                      rows="3"
+                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
                   </div>
                 </div>
+              </div>
 
-                {/* SELECT OPTIONS */}
-                <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm mb-6">
-                  <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">SELECT OPTIONS</h2>
-                  
-                  <div className="space-y-5">
-                    {/* BILL BOOK */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">BILL BOOK</label>
-                      <div className="relative">
-                        <select
-                          value={selectedBillBook}
-                          onChange={(e) => setSelectedBillBook(e.target.value)}
-                          className="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                        >
-                          <option value="">---- Please Select ---</option>
-                          {options.billBooks.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <span className="text-gray-500">▼</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* BILL BOOK TYPE */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">BILL BOOK TYPE</label>
-                      <div className="relative">
-                        <select
-                          value={selectedBillBookType}
-                          onChange={(e) => setSelectedBillBookType(e.target.value)}
-                          className="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                        >
-                          <option value="">--- Please Select ---</option>
-                          {options.billBookTypes.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <span className="text-gray-500">▼</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* EACH BOOK CONTAINS */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">EACH BOOK CONTAINS</label>
-                      <div className="relative">
-                        <select
-                          value={selectedBookContains}
-                          onChange={(e) => setSelectedBookContains(e.target.value)}
-                          className="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                        >
-                          <option value="">--- Please Select ---</option>
-                          {options.bookContains.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <span className="text-gray-500">▼</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* PAPER TYPE */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">PAPER TYPE</label>
-                      <div className="relative">
-                        <select
-                          value={selectedPaperType}
-                          onChange={(e) => setSelectedPaperType(e.target.value)}
-                          className="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                        >
-                          <option value="">--- Please Select ---</option>
-                          {options.paperTypes.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <span className="text-gray-500">▼</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* SERIAL NUMBER */}
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-800 mb-2">SERIAL NUMBER</label>
-                      <div className="relative">
-                        <select
-                          value={selectedSerialNumber}
-                          onChange={(e) => setSelectedSerialNumber(e.target.value)}
-                          className="w-full p-3.5 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 appearance-none bg-white"
-                        >
-                          <option value="">--- Please Select ---</option>
-                          {options.serialNumbers.map((option, index) => (
-                            <option key={index} value={option}>{option}</option>
-                          ))}
-                        </select>
-                        <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                          <span className="text-gray-500">▼</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Reset Options Button */}
-                    <button
-                      onClick={resetOptions}
-                      className="w-full py-3.5 bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 font-semibold rounded-xl hover:from-gray-200 hover:to-gray-300 transition-all border border-gray-300 flex items-center justify-center"
+              {/* Product Configuration */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
+                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
+                    <span className="text-purple-600 font-bold">2</span>
+                  </span>
+                  Customize Your Bill Book
+                </h2>
+                
+                <div className="space-y-4">
+                  {/* Bill Book Type */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Bill Book Type</label>
+                    <select
+                      value={selectedBillBook}
+                      onChange={(e) => setSelectedBillBook(e.target.value)}
+                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                     >
-                      <span className="mr-2">🔄</span>
-                      Reset options
+                      <option value="">Select Bill Book Type</option>
+                      {options.billBooks.map((option, index) => (
+                        <option key={index} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Size */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Size</label>
+                    <select
+                      value={selectedBillBookType}
+                      onChange={(e) => setSelectedBillBookType(e.target.value)}
+                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select Size</option>
+                      {options.billBookTypes.map((option, index) => (
+                        <option key={index} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Book Contains */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Book Contains</label>
+                    <select
+                      value={selectedBookContains}
+                      onChange={(e) => setSelectedBookContains(e.target.value)}
+                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select Pages/Sheets</option>
+                      {options.bookContains.map((option, index) => (
+                        <option key={index} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Paper Type */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Paper Type</label>
+                    <select
+                      value={selectedPaperType}
+                      onChange={(e) => setSelectedPaperType(e.target.value)}
+                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select Paper Type</option>
+                      {options.paperTypes.map((option, index) => (
+                        <option key={index} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Serial Number */}
+                  <div>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Serial Number</label>
+                    <select
+                      value={selectedSerialNumber}
+                      onChange={(e) => setSelectedSerialNumber(e.target.value)}
+                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    >
+                      <option value="">Select Serial Number Option</option>
+                      {options.serialNumbers.map((option, index) => (
+                        <option key={index} value={option}>{option}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <button
+                    onClick={resetOptions}
+                    className="w-full py-2 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+                  >
+                    Reset Options
+                  </button>
+                </div>
+              </div>
+
+              {/* Price & Quantity */}
+              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
+                <div className="flex justify-between items-center mb-4">
+                  <span className="text-2xl font-bold text-gray-900">₹{calculatePrice()}</span>
+                  <div className="flex items-center space-x-3">
+                    <button
+                      onClick={decrementQuantity}
+                      className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl font-bold hover:bg-gray-200"
+                    >
+                      -
+                    </button>
+                    <span className="font-bold text-xl">{quantity}</span>
+                    <button
+                      onClick={incrementQuantity}
+                      className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl font-bold hover:bg-gray-200"
+                    >
+                      +
                     </button>
                   </div>
                 </div>
-              </div>
-            </div>
 
-            {/* PrintShoppy Features Section */}
-            <div className="mt-12 bg-gradient-to-r from-blue-50 to-purple-50 p-8 rounded-2xl border border-blue-100">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {promiseData.map((item, index) => (
-                  <div key={index} className="bg-white p-6 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow duration-300">
-                    <div className="flex items-center mb-4">
-                      <div className="mr-4">
-                        {item.icon}
-                      </div>
-                      <h3 className="text-lg font-bold text-gray-900">{item.title}</h3>
-                    </div>
-                    <p className="text-gray-600">{item.description}</p>
+                {/* Delivery Check */}
+                <div className="mb-4">
+                  <div className="flex">
+                    <input
+                      type="text"
+                      value={pincode}
+                      onChange={(e) => setPincode(e.target.value)}
+                      placeholder="Enter Pincode"
+                      className="flex-1 p-3 border-2 border-gray-300 rounded-l-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      maxLength="6"
+                    />
+                    <button
+                      onClick={handleCheckDelivery}
+                      className="px-6 bg-blue-600 text-white font-medium rounded-r-xl hover:bg-blue-700"
+                    >
+                      Check
+                    </button>
                   </div>
-                ))}
+                  {showDeliveryCheck && (
+                    <div className="mt-2 p-2 bg-green-50 text-green-700 rounded-lg text-sm flex items-center">
+                      <FaCheckCircle className="mr-2" />
+                      Delivery available in 5-7 days
+                    </div>
+                  )}
+                </div>
+
+                {/* Add to Cart Button */}
+                <button
+                  onClick={handleAddToCart}
+                  disabled={isAddingToCart}
+                  className={`w-full py-4 ${
+                    isAddingToCart 
+                      ? 'bg-gray-400 cursor-not-allowed' 
+                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
+                  } text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center text-lg group`}
+                >
+                  {isAddingToCart ? (
+                    <>
+                      <FaSpinner className="animate-spin mr-3" />
+                      ADDING TO CART...
+                    </>
+                  ) : (
+                    <>
+                      <FaShoppingCart className="mr-3" />
+                      ADD TO CART
+                      <FaArrowRight className="ml-3 transform group-hover:translate-x-1 transition-transform" />
+                    </>
+                  )}
+                </button>
               </div>
             </div>
+          </div>
+
+          {/* Features Section */}
+          <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6">
+            {promiseData.map((item, index) => (
+              <div key={index} className="bg-white p-6 rounded-xl border border-gray-200 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+                <div className="flex items-center mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full flex items-center justify-center mr-3">
+                    {item.icon}
+                  </div>
+                  <h3 className="font-bold text-gray-900">{item.title}</h3>
+                </div>
+                <p className="text-gray-600 text-sm">{item.description}</p>
+              </div>
+            ))}
           </div>
         </div>
       </div>

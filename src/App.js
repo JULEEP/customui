@@ -28,6 +28,10 @@ import PrescriptionPadList from "./Pages/PrescriptionPadList";
 import SinglePrescriptionPad from "./Pages/SinglePrescriptionPad";
 import CashReceiptList from "./Pages/CashReceiptList";
 import CashReceiptDesignPage from "./Pages/CashReceiptDesignPage";
+import Cart from "./Pages/EmptyCartPage";
+import Checkout from "./Pages/Checkout";
+import MyOrders from "./Pages/MyOrders";
+import AllFlexItems from "./Pages/AllFlexItems";
 
 function App() {
   return (
@@ -55,6 +59,10 @@ function App() {
         <Route path="/prescriptionpad/:id" element={<SinglePrescriptionPad />} />
         <Route path="/receipts" element={<CashReceiptList />} />
         <Route path="/receipt/:id" element={<CashReceiptDesignPage />} />
+        <Route path="/cart" element={<Cart />} />
+        <Route path="/checkout" element={<Checkout />} />
+        <Route path="/my-orders" element={<MyOrders />} />
+        <Route path="/flex-items" element={<AllFlexItems />} />
       </Routes>
     </Router>
   );
