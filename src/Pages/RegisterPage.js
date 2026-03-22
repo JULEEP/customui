@@ -58,7 +58,7 @@ const RegisterPage = () => {
     
     try {
       // API Call
-      const response = await fetch("http://localhost:4050/api/auth/register", {
+      const response = await fetch("https://designback.onrender.com/api/auth/register", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

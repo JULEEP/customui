@@ -41,7 +41,7 @@ const SingleBillBook = () => {
   const [imageError, setImageError] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
-  const API_BASE_URL = "http://localhost:4050";
+  const API_BASE_URL = "https://designback.onrender.com";
 
   useEffect(() => {
     fetchBillBook();

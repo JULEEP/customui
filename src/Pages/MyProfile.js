@@ -49,7 +49,7 @@ const MyProfile = () => {
     }
     
     try {
-      const response = await fetch(`http://localhost:4050/api/auth/user/${userId}`, {
+      const response = await fetch(`https://designback.onrender.com/api/auth/user/${userId}`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -94,7 +94,7 @@ const MyProfile = () => {
     const userId = getUserId();
     
     try {
-      const response = await fetch(`http://localhost:4050/api/auth/profile`, {
+      const response = await fetch(`https://designback.onrender.com/api/auth/profile`, {
         method: "PUT",
         headers: {
           "Authorization": `Bearer ${token}`,
