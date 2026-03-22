@@ -115,7 +115,6 @@ const BusinessNeedsExact = () => {
     } else if (productName === "Cash Receipts") {
       navigate("/receipts");
     }
-    // Add other product navigations here if needed
   };
 
   const handleBannerClick = () => {
@@ -123,18 +122,47 @@ const BusinessNeedsExact = () => {
   };
 
   return (
-    <div className="py-12 px-4 bg-gradient-to-b from-gray-50 to-white">
-      <div className="max-w-7xl mx-auto">
-        <h2 className="text-3xl font-bold text-gray-900 text-center mb-10">
-          BUSINESS NEEDS
-        </h2>
+    <div className="bg-gradient-to-br from-[#e0eafc] to-[#cfdef3] py-16 px-4 relative overflow-hidden">
+      {/* Claymorphism Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        {[...Array(20)].map((_, i) => (
+          <div
+            key={i}
+            className="absolute bg-white/30 backdrop-blur-sm rounded-full border border-white/50"
+            style={{
+              width: `${Math.random() * 80 + 40}px`,
+              height: `${Math.random() * 80 + 40}px`,
+              top: `${Math.random() * 100}%`,
+              left: `${Math.random() * 100}%`,
+              animation: `float ${Math.random() * 12 + 8}s infinite ease-in-out`,
+              boxShadow: '8px 8px 16px rgba(184, 185, 190, 0.3), -8px -8px 16px rgba(255, 255, 255, 0.5)'
+            }}
+          />
+        ))}
+      </div>
 
-        {/* Banner Section - Flex Items */}
+      <div className="relative max-w-7xl mx-auto">
+        {/* Heading with Claymorphism */}
+        <div className="text-center mb-12">
+          <div className="inline-block relative">
+            <div className="bg-white/40 backdrop-blur-md rounded-3xl px-10 py-4 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
+              <h2 className="text-3xl md:text-4xl font-black text-gray-800 tracking-tight">
+                BUSINESS
+                <span className="bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent ml-3">
+                  NEEDS
+                </span>
+              </h2>
+            </div>
+            <div className="absolute -bottom-3 left-1/2 transform -translate-x-1/2 w-24 h-1 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full shadow-[2px_2px_4px_#b8b9be,_-2px_-2px_4px_#ffffff]"></div>
+          </div>
+        </div>
+
+        {/* Banner Section with Claymorphism */}
         <div 
-          className="mb-12 cursor-pointer transform hover:scale-105 transition-transform duration-300"
+          className="mb-12 cursor-pointer transform hover:scale-105 transition-all duration-500"
           onClick={handleBannerClick}
         >
-          <div className="relative rounded-2xl overflow-hidden shadow-lg hover:shadow-2xl transition-shadow">
+          <div className="relative rounded-3xl overflow-hidden shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300">
             <img
               src="https://trbahadurpur.com/wp-content/uploads/2023/05/SCHOOL-BANNER-10052023.jpg"
               alt="School Banner - Alpha Education Centre"
@@ -142,58 +170,78 @@ const BusinessNeedsExact = () => {
             />
             {/* Overlay with click indicator */}
             <div className="absolute inset-0 bg-black/20 hover:bg-black/10 transition-colors flex items-center justify-center">
-              <div className="bg-white/90 text-gray-900 px-6 py-3 rounded-full font-bold text-lg shadow-lg">
+              <div className="bg-white/90 backdrop-blur-sm text-gray-800 px-6 py-3 rounded-full font-bold text-lg shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] hover:shadow-[4px_4px_8px_#b8b9be,_-4px_-4px_8px_#ffffff] transition-all duration-300">
                 Click to View All Flex Items →
               </div>
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-5">
+        {/* Products Grid with Claymorphism */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-6">
           {products.map((product, index) => (
             <div 
               key={index} 
-              className="group"
+              className="group cursor-pointer"
               onClick={() => handleProductClick(product.name)}
             >
-              {/* Card with exact PrintShoppy image style */}
-              <div className={`bg-white rounded-2xl p-5 border border-gray-300 shadow-sm hover:shadow-xl transition-all duration-300 ${
-                product.name === "Envelopes" || product.name === "Bill Books" || product.name === "Letterheads" || product.name === "Visiting Cards" || product.name === "Prescription Pads" || product.name === "Cash Receipts" ? "cursor-pointer hover:border-blue-500" : ""
-              }`}>
+              {/* Claymorphism Card */}
+              <div className="relative bg-white/40 backdrop-blur-md rounded-2xl overflow-hidden shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300 transform group-hover:-translate-y-2 border border-white/50">
                 
-                {/* Image container like PrintShoppy */}
-                <div className="mb-4 h-56 bg-gradient-to-br from-blue-50 to-gray-100 rounded-xl overflow-hidden relative">
-                  {/* Main image with exact positioning */}
-                  <div className="absolute inset-0 flex items-center justify-center p-6">
+                {/* Image Container */}
+                <div className="mb-4 h-56 bg-gradient-to-br from-white/60 to-gray-100/60 rounded-xl overflow-hidden relative">
+                  <div className="absolute inset-0 flex items-center justify-center p-4">
                     <img
                       src={product.image}
                       alt={product.name}
-                      className="max-h-full max-w-full object-contain drop-shadow-lg"
+                      className="max-h-full max-w-full object-contain drop-shadow-md group-hover:scale-105 transition-transform duration-500"
                     />
                   </div>
                   
-                  {/* Gradient overlay corners */}
-                  <div className="absolute top-0 left-0 w-16 h-16 bg-gradient-to-br from-blue-200 to-transparent opacity-30 rounded-br-full"></div>
-                  <div className="absolute bottom-0 right-0 w-16 h-16 bg-gradient-to-tl from-purple-200 to-transparent opacity-30 rounded-tl-full"></div>
+                  {/* Decorative gradient corners */}
+                  <div className="absolute top-0 left-0 w-12 h-12 bg-gradient-to-br from-indigo-400/20 to-transparent rounded-br-full"></div>
+                  <div className="absolute bottom-0 right-0 w-12 h-12 bg-gradient-to-tl from-purple-400/20 to-transparent rounded-tl-full"></div>
                 </div>
 
-                {/* Product info */}
-                <div className="text-center">
-                  <h3 className="text-lg font-bold text-gray-900 mb-2 leading-tight">
+                {/* Product Info */}
+                <div className="p-4 text-center">
+                  <h3 className="text-lg font-bold text-gray-800 mb-2 leading-tight group-hover:text-indigo-700 transition-colors duration-300">
                     {product.name}
                   </h3>
-                  <div className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+                  <div className="text-xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
                     {product.price}
                   </div>
                 </div>
 
                 {/* Hover effect indicator */}
-                <div className="mt-4 h-1 w-0 group-hover:w-full bg-gradient-to-r from-blue-500 to-purple-500 rounded-full transition-all duration-300 mx-auto"></div>
+                <div className="absolute bottom-0 left-0 right-0 h-1 w-0 group-hover:w-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-300 mx-auto"></div>
               </div>
             </div>
           ))}
         </div>
       </div>
+
+      {/* CSS for floating animation */}
+      <style jsx>{`
+        @keyframes float {
+          0%, 100% { 
+            transform: translateY(0px) rotate(0deg); 
+          }
+          33% { 
+            transform: translateY(-12px) rotate(2deg); 
+          }
+          66% { 
+            transform: translateY(8px) rotate(-1deg); 
+          }
+        }
+        
+        /* Smooth transitions */
+        .transition-all {
+          transition-property: all;
+          transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+          transition-duration: 300ms;
+        }
+      `}</style>
     </div>
   );
 };

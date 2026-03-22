@@ -1,4 +1,4 @@
-// SingleBillBook.jsx - Updated with more fields
+// SingleBillBook.jsx - Updated with Claymorphism Design
 import React, { useState, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
@@ -7,7 +7,8 @@ import {
   FaStar, FaShippingFast, FaUndo, FaRupeeSign, FaGoogle, 
   FaSave, FaSpinner, FaShoppingCart, FaArrowRight, FaGift,
   FaCheckCircle, FaTruck, FaShieldAlt, FaHeart, FaBuilding,
-  FaMapMarkerAlt, FaPhone, FaEnvelope, FaFileInvoice, FaTag
+  FaMapMarkerAlt, FaPhone, FaEnvelope, FaFileInvoice, FaTag,
+  FaArrowLeft, FaPalette, FaLayerGroup, FaPrint, FaBarcode
 } from "react-icons/fa";
 import { toast, Toaster } from 'react-hot-toast';
 
@@ -15,15 +16,15 @@ const SingleBillBook = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  // Customer Details State - Expanded with more fields
+  // Customer Details State
   const [customerDetails, setCustomerDetails] = useState({
     companyName: "",
     address: "",
     mobile: "",
-    alternateMobile: "", // Additional field
+    alternateMobile: "",
     email: "",
-    gstNo: "", // Changed from gstin to gstNo
-    description: "" // New field for order description/notes
+    gstNo: "",
+    description: ""
   });
   
   const [quantity, setQuantity] = useState(1);
@@ -40,7 +41,7 @@ const SingleBillBook = () => {
   const [imageError, setImageError] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
 
-  const API_BASE_URL = "https://designback.onrender.com";
+  const API_BASE_URL = "http://localhost:4050";
 
   useEffect(() => {
     fetchBillBook();
@@ -105,7 +106,7 @@ const SingleBillBook = () => {
   };
 
   const handleBackClick = () => {
-    navigate("/bill-books");
+    navigate("/billbooks");
   };
 
   const handleCustomerDetailsChange = (e) => {
@@ -117,7 +118,6 @@ const SingleBillBook = () => {
   };
 
   const handleAddToCart = () => {
-    // Validate required fields
     if (!customerDetails.companyName || !customerDetails.address || !customerDetails.mobile) {
       toast.error("Please fill in Company Name, Address, and Mobile Number");
       return;
@@ -135,9 +135,8 @@ const SingleBillBook = () => {
 
     setIsAddingToCart(true);
 
-    // Create cart item with all fields
     const cartItem = {
-      id: Date.now(), // Unique ID for cart item
+      id: Date.now(),
       productId: billBook._id,
       name: billBook.name,
       image: getImageUrl(),
@@ -162,21 +161,13 @@ const SingleBillBook = () => {
       timestamp: new Date().toISOString()
     };
 
-    // Get existing cart from localStorage or initialize empty array
     const existingCart = JSON.parse(localStorage.getItem('cart')) || [];
-    
-    // Add new item
     existingCart.push(cartItem);
-    
-    // Save to localStorage
     localStorage.setItem('cart', JSON.stringify(existingCart));
 
-    // Show success message
     toast.success("Item added to cart successfully!");
-    
     setIsAddingToCart(false);
 
-    // Navigate to cart after short delay
     setTimeout(() => {
       navigate("/cart");
     }, 1500);
@@ -253,12 +244,12 @@ const SingleBillBook = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] to-[#cfdef3]">
         <Navbar />
         <div className="flex justify-center items-center h-screen">
-          <div className="text-center">
-            <FaSpinner className="animate-spin text-4xl text-blue-600 mx-auto mb-4" />
-            <p className="text-gray-600">Loading bill book details...</p>
+          <div className="text-center backdrop-blur-sm bg-white/30 p-8 rounded-3xl shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff]">
+            <FaSpinner className="animate-spin text-4xl text-indigo-600 mx-auto mb-4" />
+            <p className="text-gray-700">Loading bill book details...</p>
           </div>
         </div>
         <Footer />
@@ -268,16 +259,16 @@ const SingleBillBook = () => {
 
   if (error || !billBook) {
     return (
-      <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+      <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] to-[#cfdef3]">
         <Navbar />
         <div className="flex justify-center items-center h-screen">
-          <div className="text-center bg-red-50 p-8 rounded-xl border border-red-200 max-w-md">
+          <div className="text-center backdrop-blur-sm bg-white/40 p-8 rounded-3xl shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 max-w-md">
             <div className="text-red-500 text-4xl mb-4">⚠️</div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">Error Loading Bill Book</h3>
-            <p className="text-gray-600 mb-4">{error || "Bill book not found"}</p>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Error Loading Bill Book</h3>
+            <p className="text-gray-700 mb-4">{error || "Bill book not found"}</p>
             <button
               onClick={handleBackClick}
-              className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-xl transition-all duration-300"
             >
               Back to Bill Books
             </button>
@@ -289,49 +280,49 @@ const SingleBillBook = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white">
+    <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] to-[#cfdef3]">
       <Toaster position="top-center" />
       <Navbar />
 
       <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          {/* Back button */}
+          {/* Back button with claymorphism */}
           <button
             onClick={handleBackClick}
-            className="flex items-center text-blue-600 hover:text-blue-800 font-medium mb-6 group"
+            className="flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-medium backdrop-blur-sm bg-white/30 px-5 py-2.5 rounded-2xl shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] hover:shadow-[4px_4px_8px_#b8b9be,_-4px_-4px_8px_#ffffff] transition-all duration-300 mb-8 group"
           >
-            <span className="mr-2 transform group-hover:-translate-x-1 transition-transform">←</span>
+            <FaArrowLeft className="transform group-hover:-translate-x-1 transition-transform" />
             Back to Bill Books
           </button>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left Column - Image */}
+            {/* Left Column - Image with Claymorphism */}
             <div className="space-y-6">
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg hover:shadow-xl transition-shadow">
-                <h1 className="text-2xl font-bold text-gray-900 mb-4 text-center bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300">
+                <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent mb-4 text-center">
                   {billBook.name}
                 </h1>
                 
-                <div className="relative bg-gradient-to-br from-gray-50 to-white rounded-xl p-4 mb-4 min-h-[400px] flex items-center justify-center border-2 border-gray-200 group">
+                <div className="relative bg-gradient-to-br from-white/60 to-gray-100/60 rounded-2xl p-4 mb-4 min-h-[400px] flex items-center justify-center shadow-inner">
                   <img
                     src={getImageUrl()}
                     alt={billBook.name}
-                    className="max-h-[350px] max-w-full object-contain transform group-hover:scale-105 transition-transform duration-500"
+                    className="max-h-[350px] max-w-full object-contain transform hover:scale-105 transition-transform duration-500"
                     onError={handleImageError}
                   />
                   {billBook?.isEdited && (
-                    <div className="absolute top-4 left-4 bg-green-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center">
+                    <div className="absolute top-4 left-4 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center shadow-lg">
                       <FaCheckCircle className="mr-1" /> CUSTOMIZED
                     </div>
                   )}
                 </div>
               </div>
 
-              {/* Reviews Section */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
+              {/* Reviews Section with Claymorphism */}
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
                 <div className="flex items-center mb-4">
-                  <FaGoogle className="text-blue-600 mr-3 text-xl" />
-                  <h3 className="text-lg font-bold text-gray-900">Customer Reviews</h3>
+                  <FaGoogle className="text-indigo-600 mr-3 text-xl" />
+                  <h3 className="text-lg font-bold text-gray-800">Customer Reviews</h3>
                 </div>
                 <div className="flex items-center mb-3">
                   <div className="flex">
@@ -339,36 +330,35 @@ const SingleBillBook = () => {
                       <FaStar key={i} className="text-yellow-400 w-5 h-5" />
                     ))}
                   </div>
-                  <span className="ml-2 font-bold text-gray-900 text-xl">4.4</span>
+                  <span className="ml-2 font-bold text-gray-800 text-xl">4.4</span>
                   <span className="ml-2 text-gray-600 text-lg">(57042+ reviews)</span>
                 </div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Premium Quality</p>
+                  <div className="text-center p-2 backdrop-blur-sm bg-white/30 rounded-xl shadow-sm">
+                    <p className="text-sm text-gray-700">Premium Quality</p>
                   </div>
-                  <div className="text-center p-2 bg-gray-50 rounded-lg">
-                    <p className="text-sm text-gray-600">Fast Delivery</p>
+                  <div className="text-center p-2 backdrop-blur-sm bg-white/30 rounded-xl shadow-sm">
+                    <p className="text-sm text-gray-700">Fast Delivery</p>
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Right Column - Configuration */}
+            {/* Right Column - Configuration with Claymorphism */}
             <div className="space-y-6">
-              {/* Customer Details Form - Enhanced with more fields */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
-                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-blue-600 font-bold">1</span>
+              {/* Customer Details Form */}
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
+                <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mr-3 shadow-md">
+                    <span className="text-white font-bold text-sm">1</span>
                   </span>
                   Enter Your Details
                 </h2>
                 
                 <div className="space-y-4">
-                  {/* Company Name */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
-                      <FaBuilding className="mr-2 text-blue-600" />
+                      <FaBuilding className="mr-2 text-indigo-600" />
                       Company Name <span className="text-red-500 ml-1">*</span>
                     </label>
                     <input
@@ -377,11 +367,10 @@ const SingleBillBook = () => {
                       value={customerDetails.companyName}
                       onChange={handleCustomerDetailsChange}
                       placeholder="Enter your company name"
-                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
                     />
                   </div>
                   
-                  {/* Address */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                       <FaMapMarkerAlt className="mr-2 text-red-600" />
@@ -393,11 +382,10 @@ const SingleBillBook = () => {
                       onChange={handleCustomerDetailsChange}
                       placeholder="Enter your full address"
                       rows="3"
-                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
                     />
                   </div>
                   
-                  {/* Mobile Numbers */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
@@ -411,7 +399,7 @@ const SingleBillBook = () => {
                         onChange={handleCustomerDetailsChange}
                         placeholder="10-digit mobile"
                         maxLength="10"
-                        className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
                       />
                     </div>
                     
@@ -427,12 +415,11 @@ const SingleBillBook = () => {
                         onChange={handleCustomerDetailsChange}
                         placeholder="Alternate number"
                         maxLength="10"
-                        className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
                       />
                     </div>
                   </div>
                   
-                  {/* Email and GST */}
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
@@ -445,7 +432,7 @@ const SingleBillBook = () => {
                         value={customerDetails.email}
                         onChange={handleCustomerDetailsChange}
                         placeholder="Email address"
-                        className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
                       />
                     </div>
                     
@@ -460,12 +447,11 @@ const SingleBillBook = () => {
                         value={customerDetails.gstNo}
                         onChange={handleCustomerDetailsChange}
                         placeholder="Enter GST number"
-                        className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
                       />
                     </div>
                   </div>
 
-                  {/* Description/Notes */}
                   <div>
                     <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
                       <FaTag className="mr-2 text-pink-600" />
@@ -477,100 +463,50 @@ const SingleBillBook = () => {
                       onChange={handleCustomerDetailsChange}
                       placeholder="Any special instructions or notes for your order..."
                       rows="3"
-                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Product Configuration */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
-                <h2 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-                  <span className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center mr-3">
-                    <span className="text-purple-600 font-bold">2</span>
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
+                <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
+                  <span className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mr-3 shadow-md">
+                    <span className="text-white font-bold text-sm">2</span>
                   </span>
                   Customize Your Bill Book
                 </h2>
                 
                 <div className="space-y-4">
-                  {/* Bill Book Type */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Bill Book Type</label>
-                    <select
-                      value={selectedBillBook}
-                      onChange={(e) => setSelectedBillBook(e.target.value)}
-                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Select Bill Book Type</option>
-                      {options.billBooks.map((option, index) => (
-                        <option key={index} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Size */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Size</label>
-                    <select
-                      value={selectedBillBookType}
-                      onChange={(e) => setSelectedBillBookType(e.target.value)}
-                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Select Size</option>
-                      {options.billBookTypes.map((option, index) => (
-                        <option key={index} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Book Contains */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Book Contains</label>
-                    <select
-                      value={selectedBookContains}
-                      onChange={(e) => setSelectedBookContains(e.target.value)}
-                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Select Pages/Sheets</option>
-                      {options.bookContains.map((option, index) => (
-                        <option key={index} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Paper Type */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Paper Type</label>
-                    <select
-                      value={selectedPaperType}
-                      onChange={(e) => setSelectedPaperType(e.target.value)}
-                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Select Paper Type</option>
-                      {options.paperTypes.map((option, index) => (
-                        <option key={index} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {/* Serial Number */}
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2">Serial Number</label>
-                    <select
-                      value={selectedSerialNumber}
-                      onChange={(e) => setSelectedSerialNumber(e.target.value)}
-                      className="w-full p-3 border-2 border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    >
-                      <option value="">Select Serial Number Option</option>
-                      {options.serialNumbers.map((option, index) => (
-                        <option key={index} value={option}>{option}</option>
-                      ))}
-                    </select>
-                  </div>
+                  {[
+                    { label: "Bill Book Type", value: selectedBillBook, setter: setSelectedBillBook, options: options.billBooks, icon: <FaPrint className="mr-2 text-blue-600" /> },
+                    { label: "Size", value: selectedBillBookType, setter: setSelectedBillBookType, options: options.billBookTypes, icon: <FaLayerGroup className="mr-2 text-green-600" /> },
+                    { label: "Book Contains", value: selectedBookContains, setter: setSelectedBookContains, options: options.bookContains, icon: <FaBarcode className="mr-2 text-orange-600" /> },
+                    { label: "Paper Type", value: selectedPaperType, setter: setSelectedPaperType, options: options.paperTypes, icon: <FaPalette className="mr-2 text-purple-600" /> },
+                    { label: "Serial Number", value: selectedSerialNumber, setter: setSelectedSerialNumber, options: options.serialNumbers, icon: <FaBarcode className="mr-2 text-indigo-600" /> }
+                  ].map((field, idx) => (
+                    <div key={idx}>
+                      <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
+                        {field.icon}
+                        {field.label}
+                      </label>
+                      <select
+                        value={field.value}
+                        onChange={(e) => field.setter(e.target.value)}
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner cursor-pointer"
+                      >
+                        <option value="">Select {field.label}</option>
+                        {field.options.map((option, index) => (
+                          <option key={index} value={option}>{option}</option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
 
                   <button
                     onClick={resetOptions}
-                    className="w-full py-2 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-colors"
+                    className="w-full py-2 backdrop-blur-sm bg-white/50 text-gray-700 font-semibold rounded-xl hover:bg-white/70 transition-all duration-300 shadow-sm"
                   >
                     Reset Options
                   </button>
@@ -578,20 +514,22 @@ const SingleBillBook = () => {
               </div>
 
               {/* Price & Quantity */}
-              <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-lg">
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
                 <div className="flex justify-between items-center mb-4">
-                  <span className="text-2xl font-bold text-gray-900">₹{calculatePrice()}</span>
+                  <span className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
+                    ₹{calculatePrice()}
+                  </span>
                   <div className="flex items-center space-x-3">
                     <button
                       onClick={decrementQuantity}
-                      className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl font-bold hover:bg-gray-200"
+                      className="w-10 h-10 backdrop-blur-sm bg-white/50 rounded-full flex items-center justify-center text-xl font-bold hover:bg-white/70 transition-all duration-300 shadow-sm"
                     >
                       -
                     </button>
-                    <span className="font-bold text-xl">{quantity}</span>
+                    <span className="font-bold text-xl text-gray-800">{quantity}</span>
                     <button
                       onClick={incrementQuantity}
-                      className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center text-xl font-bold hover:bg-gray-200"
+                      className="w-10 h-10 backdrop-blur-sm bg-white/50 rounded-full flex items-center justify-center text-xl font-bold hover:bg-white/70 transition-all duration-300 shadow-sm"
                     >
                       +
                     </button>
@@ -606,18 +544,18 @@ const SingleBillBook = () => {
                       value={pincode}
                       onChange={(e) => setPincode(e.target.value)}
                       placeholder="Enter Pincode"
-                      className="flex-1 p-3 border-2 border-gray-300 rounded-l-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                      className="flex-1 p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-l-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
                       maxLength="6"
                     />
                     <button
                       onClick={handleCheckDelivery}
-                      className="px-6 bg-blue-600 text-white font-medium rounded-r-xl hover:bg-blue-700"
+                      className="px-6 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-medium rounded-r-xl hover:shadow-lg transition-all duration-300"
                     >
                       Check
                     </button>
                   </div>
                   {showDeliveryCheck && (
-                    <div className="mt-2 p-2 bg-green-50 text-green-700 rounded-lg text-sm flex items-center">
+                    <div className="mt-2 p-2 bg-green-500/20 backdrop-blur-sm text-green-700 rounded-lg text-sm flex items-center border border-green-500/30">
                       <FaCheckCircle className="mr-2" />
                       Delivery available in 5-7 days
                     </div>
@@ -631,8 +569,8 @@ const SingleBillBook = () => {
                   className={`w-full py-4 ${
                     isAddingToCart 
                       ? 'bg-gray-400 cursor-not-allowed' 
-                      : 'bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700'
-                  } text-white font-bold rounded-xl transition-all shadow-lg flex items-center justify-center text-lg group`}
+                      : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
+                  } text-white font-bold rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center text-lg group`}
                 >
                   {isAddingToCart ? (
                     <>
@@ -651,15 +589,15 @@ const SingleBillBook = () => {
             </div>
           </div>
 
-          {/* Features Section */}
+          {/* Features Section with Claymorphism */}
           <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6">
             {promiseData.map((item, index) => (
-              <div key={index} className="bg-white p-6 rounded-xl border border-gray-200 shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-1">
+              <div key={index} className="backdrop-blur-sm bg-white/40 rounded-2xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300 transform hover:-translate-y-1">
                 <div className="flex items-center mb-3">
-                  <div className="w-12 h-12 bg-gradient-to-br from-blue-50 to-purple-50 rounded-full flex items-center justify-center mr-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-white/60 to-gray-100/60 rounded-full flex items-center justify-center mr-3 shadow-inner">
                     {item.icon}
                   </div>
-                  <h3 className="font-bold text-gray-900">{item.title}</h3>
+                  <h3 className="font-bold text-gray-800">{item.title}</h3>
                 </div>
                 <p className="text-gray-600 text-sm">{item.description}</p>
               </div>

@@ -32,20 +32,21 @@ import Cart from "./Pages/EmptyCartPage";
 import Checkout from "./Pages/Checkout";
 import MyOrders from "./Pages/MyOrders";
 import AllFlexItems from "./Pages/AllFlexItems";
+import MyProfile from "./Pages/MyProfile";
 
 function App() {
   return (
     <Router>
       {/* Google Translate Widget at the Top */}
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        <Route path="/home" element={<HomePage />} />
         <Route path="/features" element={<KeyFeatures />} />
         <Route path="/whyus" element={<WhyChooseAlludeAI />} />
         <Route path="/contactus" element={<ContactUs />} />
         <Route path="/aboutus" element={<AboutAlludeAI />} />
         <Route path="/billbooks" element={<BillBooksGrid />} />
         <Route path="/bill-books/:id" element={<SingleBillBook />} />
-        <Route path="/login" element={<LoginPage />} />
+        <Route path="/" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/cart" element={<EmptyCartPage />} />
         <Route path="/wishlist" element={<WishlistPage />} />
@@ -63,6 +64,7 @@ function App() {
         <Route path="/checkout" element={<Checkout />} />
         <Route path="/my-orders" element={<MyOrders />} />
         <Route path="/flex-items" element={<AllFlexItems />} />
+        <Route path="/my-profile" element={<MyProfile />} />
       </Routes>
     </Router>
   );
