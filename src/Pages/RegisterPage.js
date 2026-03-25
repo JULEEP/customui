@@ -85,7 +85,7 @@ const RegisterPage = () => {
         
         alert("Registration successful! Welcome to PrintShoppy!");
         // Navigate to login page
-        navigate("/login");
+        navigate("/");
       } else {
         setError(data.message || "Registration failed. Please try again.");
       }
