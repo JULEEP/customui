@@ -3,13 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { 
   FaHeart, FaShoppingCart, FaUser, FaSignInAlt, FaUserPlus,
   FaTrophy, FaUsers, FaCamera, FaGem, FaTruck, FaStarHalfAlt,
-  FaPalette, FaHome, FaSignOutAlt, FaUserCircle
+  FaPalette, FaHome, FaSignOutAlt, FaUserCircle, FaStore,
+  FaClipboardList, FaGift, FaHistory
 } from "react-icons/fa";
 
 const PrintShoppyNavbar = () => {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
+  const [activeTab, setActiveTab] = useState("home");
 
   // Check if user is logged in on component mount
   useEffect(() => {
@@ -42,6 +44,7 @@ const PrintShoppyNavbar = () => {
     localStorage.removeItem("rememberMe");
     setIsLoggedIn(false);
     setUser(null);
+    setActiveTab("home");
     navigate("/");
   };
 
@@ -56,11 +59,30 @@ const PrintShoppyNavbar = () => {
 
   const handleLoginClick = () => navigate("/");
   const handleRegisterClick = () => navigate("/register");
-  const handleWishlistClick = () => navigate("/wishlist");
-  const handleCartClick = () => navigate("/cart");
-  const handleLogoClick = () => navigate("/home");
-  const handleHomeClick = () => navigate("/home");
-  const handleProfileClick = () => navigate("/my-profile");
+  const handleWishlistClick = () => {
+    setActiveTab("wishlist");
+    navigate("/wishlist");
+  };
+  const handleCartClick = () => {
+    setActiveTab("cart");
+    navigate("/cart");
+  };
+  const handleLogoClick = () => {
+    setActiveTab("home");
+    navigate("/home");
+  };
+  const handleHomeClick = () => {
+    setActiveTab("home");
+    navigate("/home");
+  };
+  const handleProfileClick = () => {
+    setActiveTab("profile");
+    navigate("/my-profile");
+  };
+  const handleOrdersClick = () => {
+    setActiveTab("orders");
+    navigate("/orders");
+  };
   const handleLogout = () => logout();
 
   return (
@@ -122,20 +144,31 @@ const PrintShoppyNavbar = () => {
         
         .badge {
           position: absolute;
-          top: -6px;
-          right: -6px;
+          top: -4px;
+          right: -8px;
           background: linear-gradient(135deg, #FF416C, #FF4B2B);
           color: white;
-          font-size: 10px;
+          font-size: 9px;
           font-weight: bold;
-          width: 18px;
-          height: 18px;
-          border-radius: 50%;
+          min-width: 16px;
+          height: 16px;
+          border-radius: 20px;
           display: flex;
           align-items: center;
           justify-content: center;
+          padding: 0 4px;
           box-shadow: 0 2px 8px rgba(255, 65, 108, 0.4);
           border: 1px solid rgba(255, 255, 255, 0.5);
+          animation: badgePulse 1.5s ease-in-out infinite;
+        }
+        
+        @keyframes badgePulse {
+          0%, 100% {
+            transform: scale(1);
+          }
+          50% {
+            transform: scale(1.1);
+          }
         }
         
         .logo-glow {
@@ -154,18 +187,27 @@ const PrintShoppyNavbar = () => {
           gap: 12px;
         }
 
-        /* Bottom Navigation Styles */
+        /* Modern Bottom Navigation - Clean 4 Icon Design */
         .bottom-nav {
           position: fixed;
           bottom: 0;
           left: 0;
           right: 0;
-          background: rgba(255, 255, 255, 0.95);
+          background: rgba(255, 255, 255, 0.98);
           backdrop-filter: blur(20px);
-          border-top: 1px solid rgba(255, 255, 255, 0.3);
-          box-shadow: 0 -8px 20px rgba(0, 0, 0, 0.05);
+          border-top: 1px solid rgba(0, 0, 0, 0.05);
+          box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.03);
           z-index: 100;
-          padding: 8px 16px 12px;
+          padding: 10px 20px 14px;
+        }
+
+        .bottom-nav-container {
+          display: flex;
+          justify-content: space-around;
+          align-items: center;
+          width: 100%;
+          max-width: 350px;
+          margin: 0 auto;
         }
 
         .bottom-nav-item {
@@ -173,35 +215,113 @@ const PrintShoppyNavbar = () => {
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          gap: 4px;
-          padding: 8px 0;
-          border-radius: 1rem;
-          transition: all 0.3s ease;
+          gap: 5px;
+          padding: 6px 0;
+          border-radius: 12px;
+          transition: all 0.2s ease;
           background: transparent;
-          color: #6B7280;
+          color: #9CA3AF;
+          position: relative;
+          cursor: pointer;
+          flex: 1;
         }
-
+        
         .bottom-nav-item:hover {
           transform: translateY(-2px);
+        }
+        
+        .bottom-nav-item.active {
           color: #8B5CF6;
         }
-
+        
+        .bottom-nav-item.active .nav-icon-wrapper {
+          transform: scale(1.05);
+        }
+        
+        .nav-icon-wrapper {
+          position: relative;
+          transition: all 0.2s ease;
+        }
+        
+        .nav-icon {
+          transition: all 0.2s ease;
+          font-size: 24px;
+        }
+        
+        .bottom-nav-item.active .nav-icon {
+          filter: drop-shadow(0 2px 6px rgba(139, 92, 246, 0.3));
+        }
+        
+        .nav-label {
+          font-size: 11px;
+          font-weight: 500;
+          text-align: center;
+          letter-spacing: 0.3px;
+        }
+        
+        /* Active indicator dot */
+        .active-dot {
+          position: absolute;
+          bottom: -8px;
+          left: 50%;
+          transform: translateX(-50%);
+          width: 4px;
+          height: 4px;
+          background: #8B5CF6;
+          border-radius: 50%;
+          opacity: 0;
+          transition: all 0.2s ease;
+        }
+        
+        .bottom-nav-item.active .active-dot {
+          opacity: 1;
+          bottom: -6px;
+        }
+        
+        /* Mobile Logout Button */
+        .mobile-logout-btn {
+          position: fixed;
+          bottom: 85px;
+          right: 20px;
+          background: linear-gradient(135deg, #ef4444, #dc2626);
+          color: white;
+          width: 52px;
+          height: 52px;
+          border-radius: 50%;
+          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+          z-index: 101;
+          transition: all 0.3s ease;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          cursor: pointer;
+          border: none;
+        }
+        
+        .mobile-logout-btn:hover {
+          transform: scale(1.05);
+          box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+        }
+        
         /* Responsive */
         @media (min-width: 768px) {
           .bottom-nav {
             display: none;
           }
-          .mobile-only {
-            display: none;
+          .mobile-logout-btn {
+            display: none !important;
           }
         }
-
+        
         @media (max-width: 767px) {
           .desktop-icons {
             display: none !important;
           }
           body {
             padding-bottom: 70px;
+          }
+          .mobile-logout-btn {
+            display: ${isLoggedIn ? 'flex' : 'none'};
           }
         }
       `}</style>
@@ -235,7 +355,6 @@ const PrintShoppyNavbar = () => {
 
               {/* Desktop Icons - Hidden on Mobile */}
               <div className="desktop-icons">
-                {/* Wishlist */}
                 <div className="relative">
                   <button
                     onClick={handleWishlistClick}
@@ -246,7 +365,6 @@ const PrintShoppyNavbar = () => {
                   <span className="badge">3</span>
                 </div>
 
-                {/* Cart */}
                 <div className="relative">
                   <button
                     onClick={handleCartClick}
@@ -324,39 +442,71 @@ const PrintShoppyNavbar = () => {
         </div>
       </nav>
 
-      {/* Mobile Bottom Navigation Bar - Only visible on mobile */}
+      {/* Clean Mobile Bottom Navigation - 4 Icons like Home, Wishlist, Cart, Profile */}
       <div className="bottom-nav">
-        <div className="grid grid-cols-4 gap-1">
-          <button onClick={handleHomeClick} className="bottom-nav-item">
-            <FaHome className="text-2xl" />
-            <span className="text-xs font-medium">Home</span>
-          </button>
-
-          <button onClick={handleWishlistClick} className="bottom-nav-item relative">
-            <div className="relative">
-              <FaHeart className="text-2xl" />
-              <span className="badge" style={{ top: '-8px', right: '-12px' }}>3</span>
+        <div className="bottom-nav-container">
+          {/* Home */}
+          <button 
+            onClick={handleHomeClick} 
+            className={`bottom-nav-item ${activeTab === 'home' ? 'active' : ''}`}
+          >
+            <div className="nav-icon-wrapper">
+              <FaHome className="nav-icon" />
+              <div className="active-dot"></div>
             </div>
-            <span className="text-xs font-medium">Wishlist</span>
+            <span className="nav-label">Home</span>
           </button>
 
-          <button onClick={handleCartClick} className="bottom-nav-item relative">
-            <div className="relative">
-              <FaShoppingCart className="text-2xl" />
-              <span className="badge" style={{ top: '-8px', right: '-12px' }}>5</span>
+          {/* Wishlist with Badge */}
+          <button 
+            onClick={handleWishlistClick} 
+            className={`bottom-nav-item ${activeTab === 'wishlist' ? 'active' : ''}`}
+          >
+            <div className="nav-icon-wrapper relative">
+              <FaHeart className="nav-icon" />
+              <span className="badge">3</span>
+              <div className="active-dot"></div>
             </div>
-            <span className="text-xs font-medium">Cart</span>
+            <span className="nav-label">Wishlist</span>
           </button>
 
+          {/* Cart with Badge */}
+          <button 
+            onClick={handleCartClick} 
+            className={`bottom-nav-item ${activeTab === 'cart' ? 'active' : ''}`}
+          >
+            <div className="nav-icon-wrapper relative">
+              <FaShoppingCart className="nav-icon" />
+              <span className="badge">5</span>
+              <div className="active-dot"></div>
+            </div>
+            <span className="nav-label">Cart</span>
+          </button>
+
+          {/* Profile / Account */}
           <button
             onClick={isLoggedIn ? handleProfileClick : handleLoginClick}
-            className="bottom-nav-item"
+            className={`bottom-nav-item ${activeTab === 'profile' ? 'active' : ''}`}
           >
-            <FaUser className="text-2xl" />
-            <span className="text-xs font-medium">{isLoggedIn ? "Profile" : "Account"}</span>
+            <div className="nav-icon-wrapper">
+              {isLoggedIn ? <FaUserCircle className="nav-icon" /> : <FaUser className="nav-icon" />}
+              <div className="active-dot"></div>
+            </div>
+            <span className="nav-label">{isLoggedIn ? "Profile" : "Account"}</span>
           </button>
         </div>
       </div>
+
+      {/* Mobile Logout Button - Only visible when logged in */}
+      {isLoggedIn && (
+        <button
+          onClick={handleLogout}
+          className="mobile-logout-btn"
+          aria-label="Logout"
+        >
+          <FaSignOutAlt className="text-xl" />
+        </button>
+      )}
 
       {/* Spacing */}
       <div className="pt-16 md:pt-20 pb-20"></div>
