@@ -12,10 +12,20 @@ const PrintShoppyNavbar = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [user, setUser] = useState(null);
   const [activeTab, setActiveTab] = useState("home");
+  const [cartCount, setCartCount] = useState(0);
+  const [wishlistCount, setWishlistCount] = useState(0);
 
   // Check if user is logged in on component mount
   useEffect(() => {
     checkLoginStatus();
+    updateCounts();
+    
+    // Listen for storage changes to update cart/wishlist counts
+    window.addEventListener('storage', updateCounts);
+    
+    return () => {
+      window.removeEventListener('storage', updateCounts);
+    };
   }, []);
 
   const checkLoginStatus = () => {
@@ -35,6 +45,16 @@ const PrintShoppyNavbar = () => {
       setIsLoggedIn(false);
       setUser(null);
     }
+  };
+
+  const updateCounts = () => {
+    // Update cart count
+    const cart = JSON.parse(localStorage.getItem('cart') || '[]');
+    setCartCount(cart.length);
+    
+    // Update wishlist count
+    const wishlist = JSON.parse(localStorage.getItem('wishlist') || '[]');
+    setWishlistCount(wishlist.length);
   };
 
   // Logout function
@@ -303,6 +323,21 @@ const PrintShoppyNavbar = () => {
           box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
         }
         
+        /* Logo image styling */
+        .custom-logo {
+          width: 50px;
+          height: 50px;
+          object-fit: contain;
+          border-radius: 12px;
+        }
+        
+        @media (min-width: 768px) {
+          .custom-logo {
+            width: 56px;
+            height: 56px;
+          }
+        }
+        
         /* Responsive */
         @media (min-width: 768px) {
           .bottom-nav {
@@ -336,14 +371,28 @@ const PrintShoppyNavbar = () => {
                 className="flex items-center space-x-2 md:space-x-4 cursor-pointer group"
                 onClick={handleLogoClick}
               >
-                <div className="w-10 h-10 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-xl md:text-2xl shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] logo-glow">
-                  CD
+                {/* Custom Logo from public folder */}
+                <div className="relative">
+                  <img 
+                    src="/customlogo.jpeg" 
+                    alt="Custom Design Logo"
+                    className="custom-logo shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] logo-glow transition-all duration-300 group-hover:scale-105"
+                    onError={(e) => {
+                      e.target.onerror = null;
+                      e.target.style.display = 'none';
+                      e.target.parentElement.innerHTML = `
+                        <div class="w-10 h-10 md:w-14 md:h-14 rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-500 flex items-center justify-center text-white font-black text-xl md:text-2xl shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] logo-glow">
+                          CD
+                        </div>
+                      `;
+                    }}
+                  />
                 </div>
                 <div>
                   <h1 className="text-xl md:text-3xl font-extrabold tracking-tight">
-                    <span className="text-gray-800">CUSTOM</span>
+                    <span className="text-gray-800">JAISWAL</span>
                     <span className="bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent ml-1 md:ml-2">
-                      DESIGN
+                      OFFSET
                     </span>
                   </h1>
                   <p className="text-[10px] md:text-xs text-gray-600 font-medium mt-0.5 md:mt-1 flex items-center">
@@ -362,7 +411,9 @@ const PrintShoppyNavbar = () => {
                   >
                     <FaHeart className="text-red-500 text-lg md:text-xl" />
                   </button>
-                  <span className="badge">3</span>
+                  {wishlistCount > 0 && (
+                    <span className="badge">{wishlistCount > 99 ? '99+' : wishlistCount}</span>
+                  )}
                 </div>
 
                 <div className="relative">
@@ -372,7 +423,9 @@ const PrintShoppyNavbar = () => {
                   >
                     <FaShoppingCart className="text-indigo-600 text-lg md:text-xl" />
                   </button>
-                  <span className="badge">5</span>
+                  {cartCount > 0 && (
+                    <span className="badge">{cartCount > 99 ? '99+' : cartCount}</span>
+                  )}
                 </div>
 
                 {isLoggedIn && user ? (
@@ -464,7 +517,9 @@ const PrintShoppyNavbar = () => {
           >
             <div className="nav-icon-wrapper relative">
               <FaHeart className="nav-icon" />
-              <span className="badge">3</span>
+              {wishlistCount > 0 && (
+                <span className="badge">{wishlistCount > 99 ? '99+' : wishlistCount}</span>
+              )}
               <div className="active-dot"></div>
             </div>
             <span className="nav-label">Wishlist</span>
@@ -477,7 +532,9 @@ const PrintShoppyNavbar = () => {
           >
             <div className="nav-icon-wrapper relative">
               <FaShoppingCart className="nav-icon" />
-              <span className="badge">5</span>
+              {cartCount > 0 && (
+                <span className="badge">{cartCount > 99 ? '99+' : cartCount}</span>
+              )}
               <div className="active-dot"></div>
             </div>
             <span className="nav-label">Cart</span>

@@ -29,24 +29,26 @@ const BillBooksGrid = () => {
         // Transform API data to match component structure
         const transformedData = result.data.map(book => ({
           id: book._id,
-          name: book.name,
-          // Handle image path - convert backslashes to forward slashes and prepend base URL
-          image: `${API_BASE_URL}/${book.file.replace(/\\/g, '/')}`,
-          // Generate price based on text elements count or use default
-          price: `₹${(book.textElements?.length * 100 + 500)}/-`,
-          // Use description from text elements or default
-          description: book.textElements?.find(t => t.text.includes("Description"))?.text || 
-                      book.textElements?.[0]?.text || 
-                      "Custom bill book with multiple text elements",
-          // Generate colors array based on text element colors
-          colors: [...new Set(book.textElements?.map(t => t.color).slice(0, 3) || [])]
-                  .map(color => color || "Default"),
-          // Calculate pages based on text elements count
-          pages: Math.max(50, book.textElements?.length * 20),
+          name: book.companyName || "Bill Book",
+          // Use previewImage directly
+          image: book.previewImage ? `${API_BASE_URL}${book.previewImage}` : "https://cdn.printshoppy.com/image/catalog/v9/webp/home-page/regular/home-page-office-stationery-prescription-pads.webp",
+          // Generate price based on company name or use default
+          price: `₹${(Math.floor(Math.random() * 500) + 500)}/-`,
+          // Use company info for description
+          description: `${book.companyName} - ${book.companyAddress?.substring(0, 60) || "Professional bill book with custom design"}`,
+          // Generate colors based on design accent color
+          colors: [book.design?.accentColor || "#3b82f6", book.design?.textColor || "#000000", book.design?.backgroundColor || "#ffffff"],
+          // Calculate pages (default 50 pages)
+          pages: 50,
           // Store all text elements for modal view
           textElements: book.textElements || [],
           // Store original data
-          originalData: book
+          originalData: book,
+          // Additional info for display
+          companyEmail: book.companyEmail,
+          companyPhone: book.companyPhone,
+          status: book.status,
+          hasLogo: book.logoSettings?.show && book.logo
         }));
         
         setBillBooks(transformedData);
@@ -199,10 +201,10 @@ const BillBooksGrid = () => {
               className="group cursor-pointer transition-all duration-300 transform hover:-translate-y-2"
             >
               {/* Claymorphism Card */}
-              <div className="bg-white/40 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300 border border-white/30">
+              <div className="bg-white/40 backdrop-blur-sm rounded-2xl sm:rounded-3xl p-4 sm:p-5 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300 border border-white/30 h-full flex flex-col">
                 
                 {/* Image Container with Soft Edges */}
-                <div className="mb-4 sm:mb-5 h-44 sm:h-52 bg-gradient-to-br from-white/60 to-gray-100/60 rounded-xl sm:rounded-2xl overflow-hidden relative shadow-inner">
+                <div className="mb-4 sm:mb-5 h-44 sm:h-52 bg-gradient-to-br from-white/60 to-gray-100/60 rounded-xl sm:rounded-2xl overflow-hidden relative shadow-inner flex-shrink-0">
                   <div className="absolute inset-0 flex items-center justify-center p-3 sm:p-4">
                     <img
                       src={book.image}
@@ -214,19 +216,47 @@ const BillBooksGrid = () => {
                     />
                   </div>
                   
+                  {/* Status Badge */}
+                  {book.status === 'active' && (
+                    <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
+                      <span className="bg-green-500 text-white text-xs px-2 py-1 rounded-full backdrop-blur-sm bg-opacity-80">
+                        Active
+                      </span>
+                    </div>
+                  )}
+                  
+                  {/* Logo indicator */}
+                  {book.hasLogo && (
+                    <div className="absolute bottom-2 sm:bottom-3 left-2 sm:left-3">
+                      <span className="bg-white/80 text-gray-700 text-xs px-2 py-1 rounded-full backdrop-blur-sm">
+                        🏢 Logo
+                      </span>
+                    </div>
+                  )}
+                  
                   {/* Decorative elements */}
                   <div className="absolute top-2 sm:top-3 left-2 sm:left-3 w-6 sm:w-8 h-6 sm:h-8 bg-gradient-to-br from-indigo-400 to-purple-400 rounded-full opacity-20 blur-sm"></div>
                   <div className="absolute bottom-2 sm:bottom-3 right-2 sm:right-3 w-6 sm:w-8 h-6 sm:h-8 bg-gradient-to-tl from-pink-400 to-orange-400 rounded-full opacity-20 blur-sm"></div>
                 </div>
 
                 {/* Product Info */}
-                <div className="text-center space-y-2">
+                <div className="text-center space-y-2 flex-1">
                   <h3 className="text-base sm:text-lg font-bold text-gray-800 leading-tight line-clamp-2">
                     {book.name}
                   </h3>
                   <p className="text-xs sm:text-sm text-gray-600 line-clamp-2">
                     {book.description}
                   </p>
+                  
+                  {/* Contact Info Preview */}
+                  <div className="text-xs text-gray-500 space-y-0.5 mt-1">
+                    {book.companyEmail && (
+                      <div className="truncate">📧 {book.companyEmail}</div>
+                    )}
+                    {book.companyPhone && (
+                      <div>📞 {book.companyPhone}</div>
+                    )}
+                  </div>
                   
                   <div className="flex items-center justify-between pt-2">
                     <div className="text-lg sm:text-xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
@@ -239,28 +269,21 @@ const BillBooksGrid = () => {
                   
                   {/* Color Chips */}
                   <div className="mt-2 flex flex-wrap justify-center gap-1 sm:gap-1.5">
-                    {book.colors.length > 0 ? (
+                    {book.colors.length > 0 && (
                       book.colors.slice(0, 3).map((color, idx) => (
                         <span
                           key={idx}
-                          className="text-xs px-2 sm:px-2.5 py-1 rounded-full backdrop-blur-sm bg-white/50 shadow-sm"
-                          style={{ 
-                            backgroundColor: color.startsWith('#') ? `${color}30` : '#f3f4f6',
-                            color: color.startsWith('#') ? color : '#4b5563'
-                          }}
+                          className="text-xs px-2 sm:px-2.5 py-1 rounded-full backdrop-blur-sm bg-white/50 shadow-sm flex items-center gap-1"
                         >
-                          {color.startsWith('#') ? `🎨 ${idx + 1}` : color}
+                          <div 
+                            className="w-2 h-2 rounded-full" 
+                            style={{ backgroundColor: color }}
+                          ></div>
+                          <span className="text-gray-700">
+                            {idx === 0 ? 'Primary' : idx === 1 ? 'Text' : 'Background'}
+                          </span>
                         </span>
                       ))
-                    ) : (
-                      <span className="text-xs px-2 sm:px-2.5 py-1 rounded-full bg-white/50 backdrop-blur-sm">
-                        🎨 Custom Colors
-                      </span>
-                    )}
-                    {book.colors.length > 3 && (
-                      <span className="text-xs px-2 sm:px-2.5 py-1 rounded-full bg-white/50">
-                        +{book.colors.length - 3}
-                      </span>
                     )}
                   </div>
                 </div>
@@ -296,8 +319,8 @@ const BillBooksGrid = () => {
                 <span className="text-white font-bold text-base sm:text-xl">✓</span>
               </div>
               <div>
-                <h4 className="font-bold text-gray-800 text-sm sm:text-base">Multiple Text Elements</h4>
-                <p className="text-gray-600 text-xs sm:text-sm">Add unlimited text fields</p>
+                <h4 className="font-bold text-gray-800 text-sm sm:text-base">Professional Design</h4>
+                <p className="text-gray-600 text-xs sm:text-sm">Modern and elegant templates</p>
               </div>
             </div>
             <div className="flex items-start gap-3 backdrop-blur-sm bg-white/20 p-3 sm:p-4 rounded-xl sm:rounded-2xl">
@@ -305,8 +328,8 @@ const BillBooksGrid = () => {
                 <span className="text-white font-bold text-base sm:text-xl">✓</span>
               </div>
               <div>
-                <h4 className="font-bold text-gray-800 text-sm sm:text-base">Professional Templates</h4>
-                <p className="text-gray-600 text-xs sm:text-sm">Pre-designed for business needs</p>
+                <h4 className="font-bold text-gray-800 text-sm sm:text-base">Quick Delivery</h4>
+                <p className="text-gray-600 text-xs sm:text-sm">Fast printing and shipping</p>
               </div>
             </div>
           </div>
