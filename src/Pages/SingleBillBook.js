@@ -1,16 +1,15 @@
-// SingleBillBook.jsx - Updated with Business Details API Integration
-import React, { useState, useEffect } from "react";
+// SingleBillBook.jsx - Fixed with proper user ID handling
+import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 import { 
-  FaStar, FaShippingFast, FaUndo, FaRupeeSign, FaGoogle, 
-  FaSave, FaSpinner, FaShoppingCart, FaArrowRight, FaGift,
-  FaCheckCircle, FaTruck, FaShieldAlt, FaHeart, FaBuilding,
-  FaMapMarkerAlt, FaPhone, FaEnvelope, FaFileInvoice, FaTag,
+  FaStar, FaShippingFast, FaUndo, 
+  FaSave, FaSpinner, FaShoppingCart, FaArrowRight,
+  FaCheckCircle, FaShieldAlt, FaHeart, FaBuilding,
+  FaMapMarkerAlt, FaPhone, FaEnvelope, FaTag,
   FaArrowLeft, FaPalette, FaLayerGroup, FaPrint, FaBarcode,
-  FaUser, FaBriefcase, FaGlobe, FaInfoCircle, FaEye, FaTimes,
-  FaDownload, FaShare, FaUpload, FaGlobeAsia, FaIdCard
+  FaEye, FaTimes, FaDownload, FaShare, FaUpload, FaGlobeAsia, FaIdCard
 } from "react-icons/fa";
 import { toast, Toaster } from 'react-hot-toast';
 
@@ -27,7 +26,6 @@ const SingleBillBook = () => {
     email: "",
     gstNo: "",
     description: "",
-    // Business details fields
     companyWebsite: "",
     panNumber: "",
     logo: null
@@ -48,24 +46,55 @@ const SingleBillBook = () => {
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
-  
-  // Preview Modal State
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [previewError, setPreviewError] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   const API_BASE_URL = "https://designback.onrender.com";
 
-  // Get userId from localStorage
-  const userId = localStorage.getItem('userId') || '69bfccfed6cc09aa27ef4e73';
+  // Get user ID from localStorage - SAME AS MyProfile
+  const getUserIdFromStorage = useCallback(() => {
+    // First try to get from user object (same as MyProfile)
+    const userData = localStorage.getItem("user");
+    if (userData) {
+      try {
+        const user = JSON.parse(userData);
+        if (user.id) {
+          return user.id;
+        }
+      } catch (e) {
+        console.error("Error parsing user data:", e);
+      }
+    }
+    
+    // Fallback to userId key
+    const userIdFromStorage = localStorage.getItem("userId");
+    if (userIdFromStorage) {
+      return userIdFromStorage;
+    }
+    
+    return null;
+  }, []);
 
-  useEffect(() => {
-    fetchBillBook();
-    fetchExistingBusinessDetails();
-  }, [id]);
+  // Check if user is logged in
+  const checkAuth = useCallback(() => {
+    const token = localStorage.getItem("token");
+    const uid = getUserIdFromStorage();
+    
+    if (!token || !uid) {
+      toast.error("Please login to continue");
+      navigate("/login");
+      return false;
+    }
+    
+    setUserId(uid);
+    return true;
+  }, [navigate, getUserIdFromStorage]);
 
-  const fetchBillBook = async () => {
+  // Fetch bill book details
+  const fetchBillBook = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/admin/billbook/${id}`);
@@ -87,11 +116,22 @@ const SingleBillBook = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchExistingBusinessDetails = async () => {
+  // Fetch existing business details - SAME API call as MyProfile
+  const fetchExistingBusinessDetails = useCallback(async () => {
+    if (!userId) return;
+    
     try {
-      const response = await fetch(`${API_BASE_URL}/api/auth/user/${userId}`);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/api/auth/user/${userId}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
+      
       if (response.ok) {
         const result = await response.json();
         if (result.success && result.data.businessDetails) {
@@ -106,15 +146,29 @@ const SingleBillBook = () => {
             companyWebsite: details.companyWebsite || "",
             panNumber: details.panNumber || ""
           }));
+          
+          // If logo exists, show it
+          if (details.logo) {
+            setCustomerDetails(prev => ({
+              ...prev,
+              logo: details.logo
+            }));
+          }
         }
       }
     } catch (err) {
-      console.error("Error fetching existing business details:", err);
+      console.error("Error fetching business details:", err);
     }
-  };
+  }, [userId]);
 
+  // Save business details
   const handleSaveBusinessDetails = async () => {
-    // Validate required fields
+    if (!userId) {
+      toast.error("Please login first");
+      navigate('/login');
+      return;
+    }
+
     if (!customerDetails.companyName || !customerDetails.address || !customerDetails.mobile) {
       toast.error("Please fill in Company Name, Address, and Mobile Number");
       return;
@@ -133,6 +187,7 @@ const SingleBillBook = () => {
     setIsSavingDetails(true);
 
     try {
+      const token = localStorage.getItem("token");
       const formData = new FormData();
       formData.append('companyName', customerDetails.companyName);
       formData.append('companyAddress', customerDetails.address);
@@ -142,12 +197,15 @@ const SingleBillBook = () => {
       formData.append('gstNumber', customerDetails.gstNo || '');
       formData.append('panNumber', customerDetails.panNumber || '');
       
-      if (customerDetails.logo) {
+      if (customerDetails.logo && typeof customerDetails.logo !== 'string') {
         formData.append('logo', customerDetails.logo);
       }
 
       const response = await fetch(`${API_BASE_URL}/api/auth/business-details/${userId}`, {
         method: 'POST',
+        headers: {
+          "Authorization": `Bearer ${token}`
+        },
         body: formData
       });
 
@@ -156,11 +214,9 @@ const SingleBillBook = () => {
       if (result.success) {
         toast.success("Business details saved successfully!");
         setShowSuccessPopup(true);
-        
-        // Auto-hide popup after 3 seconds
-        setTimeout(() => {
-          setShowSuccessPopup(false);
-        }, 3000);
+        setTimeout(() => setShowSuccessPopup(false), 3000);
+        // Refresh business details
+        fetchExistingBusinessDetails();
       } else {
         throw new Error(result.message || "Failed to save details");
       }
@@ -189,13 +245,36 @@ const SingleBillBook = () => {
   };
 
   const fetchPreviewImage = async () => {
+    if (!userId) {
+      toast.error("Please login first");
+      navigate('/login');
+      return;
+    }
+
+    if (!customerDetails.companyName || !customerDetails.address || !customerDetails.mobile) {
+      toast.error("Please save your business details first to see the preview");
+      return;
+    }
+
     try {
       setPreviewLoading(true);
       setPreviewError(null);
       
-      const response = await fetch(`${API_BASE_URL}/api/auth/getbillbook/${userId}/${id}`);
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/api/auth/getbillbook/${userId}/${id}`, {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        }
+      });
       
       if (!response.ok) {
+        const errorData = await response.json();
+        if (errorData.requiresBusinessDetails) {
+          toast.error("Please save your business details first!");
+          return;
+        }
         throw new Error(`HTTP error! status: ${response.status}`);
       }
       
@@ -205,12 +284,12 @@ const SingleBillBook = () => {
         setPreviewImage(result.data.overlaidImage);
         setShowPreviewModal(true);
       } else {
-        throw new Error("No preview image available");
+        throw new Error(result.message || "No preview image available");
       }
     } catch (err) {
       console.error("Error fetching preview:", err);
       setPreviewError(err.message);
-      toast.error("Failed to load preview image");
+      toast.error(err.message || "Failed to load preview image");
     } finally {
       setPreviewLoading(false);
     }
@@ -240,12 +319,12 @@ const SingleBillBook = () => {
         if (navigator.share) {
           await navigator.share({
             title: 'Bill Book Preview',
-            text: `Check out this bill book design for ${billBook?.companyName}`,
+            text: `Check out this bill book design`,
             url: previewImage,
           });
         } else {
           navigator.clipboard.writeText(previewImage);
-          toast.success("Preview link copied to clipboard!");
+          toast.success("Preview link copied!");
         }
       } catch (err) {
         console.error("Error sharing:", err);
@@ -255,6 +334,12 @@ const SingleBillBook = () => {
   };
 
   const handleAddToCart = () => {
+    if (!userId) {
+      toast.error("Please login first");
+      navigate('/login');
+      return;
+    }
+
     if (!customerDetails.companyName || !customerDetails.address || !customerDetails.mobile) {
       toast.error("Please fill in Company Name, Address, and Mobile Number");
       return;
@@ -265,15 +350,11 @@ const SingleBillBook = () => {
       return;
     }
 
-    if (customerDetails.alternateMobile && customerDetails.alternateMobile.length !== 10) {
-      toast.error("Please enter a valid 10-digit alternate mobile number");
-      return;
-    }
-
     setIsAddingToCart(true);
 
     const cartItem = {
       id: Date.now(),
+      userId: userId,
       productId: billBook._id,
       name: billBook.companyName || "Bill Book",
       image: getImageUrl(),
@@ -304,22 +385,17 @@ const SingleBillBook = () => {
     existingCart.push(cartItem);
     localStorage.setItem('cart', JSON.stringify(existingCart));
 
-    toast.success("Item added to cart successfully!");
+    toast.success("Item added to cart!");
     setIsAddingToCart(false);
-
-    setTimeout(() => {
-      navigate("/cart");
-    }, 1500);
+    setTimeout(() => navigate("/cart"), 1500);
   };
 
   const calculatePrice = () => {
     let basePrice = 750;
-    
     if (billBook?.design?.showLogo) basePrice += 200;
     if (billBook?.design?.roundedCorners) basePrice += 100;
     if (billBook?.design?.shadow) basePrice += 100;
     if (billBook?.design?.border) basePrice += 50;
-    
     return basePrice * quantity;
   };
 
@@ -329,11 +405,9 @@ const SingleBillBook = () => {
   const handleCheckDelivery = () => {
     if (pincode.length === 6) {
       setShowDeliveryCheck(true);
-      setTimeout(() => {
-        setShowDeliveryCheck(false);
-      }, 3000);
+      setTimeout(() => setShowDeliveryCheck(false), 3000);
     } else {
-      toast.error("Please enter a valid 6-digit pincode");
+      toast.error("Enter valid 6-digit pincode");
     }
   };
 
@@ -345,35 +419,10 @@ const SingleBillBook = () => {
     setSelectedSerialNumber("");
   };
 
-  const promiseData = [
-    {
-      icon: <FaShippingFast className="text-2xl text-blue-600" />,
-      title: "FREE SHIPPING",
-      description: "About shipping charges, No worries its completely on us"
-    },
-    {
-      icon: <FaUndo className="text-2xl text-green-600" />,
-      title: "30 DAYS EASY RETURNS",
-      description: "We Provide 30 days hassle free returns & refunds."
-    },
-    {
-      icon: <FaShieldAlt className="text-2xl text-purple-600" />,
-      title: "QUALITY GUARANTEE",
-      description: "100% satisfaction guaranteed with premium quality"
-    },
-    {
-      icon: <FaHeart className="text-2xl text-red-600" />,
-      title: "CUSTOM DESIGN",
-      description: "Personalized just the way you want it"
-    }
-  ];
-
   const getImageUrl = () => {
     if (billBook?.previewImage) {
       const previewPath = billBook.previewImage;
-      if (previewPath.startsWith('http')) {
-        return previewPath;
-      }
+      if (previewPath.startsWith('http')) return previewPath;
       const cleanPath = previewPath.replace(/\\/g, '/');
       const normalizedPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
       return `${API_BASE_URL}/${normalizedPath}`;
@@ -381,22 +430,66 @@ const SingleBillBook = () => {
     
     if (billBook?.templateImage && !imageError) {
       const templatePath = billBook.templateImage;
-      if (templatePath.startsWith('http')) {
-        return templatePath;
-      }
+      if (templatePath.startsWith('http')) return templatePath;
       const cleanPath = templatePath.replace(/\\/g, '/');
       const normalizedPath = cleanPath.startsWith('/') ? cleanPath.substring(1) : cleanPath;
       return `${API_BASE_URL}/${normalizedPath}`;
     }
     
-    return defaultImage;
+    return "https://cdn.printshoppy.com/image/catalog/v9/webp/home-page/regular/home-page-office-stationery-prescription-pads.webp";
   };
 
-  const handleImageError = () => {
-    setImageError(true);
+  const handleImageError = () => setImageError(true);
+
+  const promiseData = [
+    { icon: <FaShippingFast className="text-2xl text-blue-600" />, title: "FREE SHIPPING", description: "No worries, shipping on us" },
+    { icon: <FaUndo className="text-2xl text-green-600" />, title: "30 DAYS RETURNS", description: "Hassle free returns & refunds" },
+    { icon: <FaShieldAlt className="text-2xl text-purple-600" />, title: "QUALITY GUARANTEE", description: "100% satisfaction guaranteed" },
+    { icon: <FaHeart className="text-2xl text-red-600" />, title: "CUSTOM DESIGN", description: "Personalized just for you" }
+  ];
+
+  const options = {
+    billBooks: ["A4 Bill Book", "A5 Bill Book", "Duplicate Bill Book", "Triplicate Bill Book", "All Originals Bill Book"],
+    billBookTypes: ["A4 Size - 21cm x 29.7cm", "A5 Size - 14.8cm x 21cm"],
+    bookContains: ["50 SET - 50 Originals + 50 Duplicates", "50 SET - 50 Originals + 50 Duplicates + 50 Triplicates", "100 SET - 100 Originals + 100 Duplicates", "100 Originals Only", "200 Originals Only"],
+    paperTypes: ["90 GSM Maplitho (Original)", "70 GSM Maplitho (Duplicate)", "70 GSM Maplitho (Triplicate)", "Multicolor Printing"],
+    serialNumbers: ["Sequential Numbering", "Custom Starting Number", "No Serial Number"]
   };
 
-  const defaultImage = "https://cdn.printshoppy.com/image/catalog/v9/webp/home-page/regular/home-page-office-stationery-prescription-pads.webp";
+  // Initialize - check auth and fetch data
+  useEffect(() => {
+    if (!checkAuth()) return;
+    fetchBillBook();
+  }, [checkAuth, fetchBillBook]);
+
+  // Fetch business details when userId is set
+  useEffect(() => {
+    if (userId) {
+      fetchExistingBusinessDetails();
+    }
+  }, [userId, fetchExistingBusinessDetails]);
+
+  if (!userId) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] to-[#cfdef3]">
+        <Navbar />
+        <div className="flex justify-center items-center h-screen">
+          <div className="text-center backdrop-blur-sm bg-white/40 p-8 rounded-3xl shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 max-w-md">
+            <div className="text-yellow-500 text-4xl mb-4">⚠️</div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Please Login</h3>
+            <p className="text-gray-700 mb-4">You need to login first to view and purchase bill books.</p>
+            <button
+              onClick={() => navigate("/login")}
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-xl transition-all duration-300"
+            >
+              Go to Login
+            </button>
+          </div>
+        </div>
+        <Footer />
+      </div>
+    );
+  }
 
   if (loading) {
     return (
@@ -435,12 +528,12 @@ const SingleBillBook = () => {
     );
   }
 
+  // Rest of the JSX remains the same as your original...
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] to-[#cfdef3]">
       <Toaster position="top-center" />
       <Navbar />
 
-      {/* Success Popup */}
       {showSuccessPopup && (
         <div className="fixed top-20 right-4 z-50 animate-slideIn">
           <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-sm">
@@ -455,7 +548,6 @@ const SingleBillBook = () => {
 
       <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
-          {/* Back button with claymorphism */}
           <button
             onClick={() => navigate("/billbooks")}
             className="flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-medium backdrop-blur-sm bg-white/30 px-5 py-2.5 rounded-2xl shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] hover:shadow-[4px_4px_8px_#b8b9be,_-4px_-4px_8px_#ffffff] transition-all duration-300 mb-8 group"
@@ -465,9 +557,9 @@ const SingleBillBook = () => {
           </button>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            {/* Left Column - Image with Claymorphism */}
+            {/* Left Column */}
             <div className="space-y-6">
-              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300">
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent mb-4 text-center">
                   {billBook.companyName || "Bill Book"}
                 </h1>
@@ -484,14 +576,8 @@ const SingleBillBook = () => {
                       <FaCheckCircle className="mr-1" /> ACTIVE
                     </div>
                   )}
-                  {billBook.logoSettings?.show && billBook.logo && (
-                    <div className="absolute top-4 right-4 bg-gradient-to-r from-blue-500 to-indigo-500 text-white text-xs font-bold px-3 py-1 rounded-full flex items-center shadow-lg">
-                      <FaHeart className="mr-1" /> LOGO INCLUDED
-                    </div>
-                  )}
                 </div>
                 
-                {/* Preview Button */}
                 <button
                   onClick={fetchPreviewImage}
                   disabled={previewLoading}
@@ -560,36 +646,10 @@ const SingleBillBook = () => {
                   )}
                 </div>
               </div>
-
-              {/* Reviews Section with Claymorphism */}
-              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
-                <div className="flex items-center mb-4">
-                  <FaGoogle className="text-indigo-600 mr-3 text-xl" />
-                  <h3 className="text-lg font-bold text-gray-800">Customer Reviews</h3>
-                </div>
-                <div className="flex items-center mb-3">
-                  <div className="flex">
-                    {[...Array(5)].map((_, i) => (
-                      <FaStar key={i} className="text-yellow-400 w-5 h-5" />
-                    ))}
-                  </div>
-                  <span className="ml-2 font-bold text-gray-800 text-xl">4.4</span>
-                  <span className="ml-2 text-gray-600 text-lg">(57042+ reviews)</span>
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="text-center p-2 backdrop-blur-sm bg-white/30 rounded-xl shadow-sm">
-                    <p className="text-sm text-gray-700">Premium Quality</p>
-                  </div>
-                  <div className="text-center p-2 backdrop-blur-sm bg-white/30 rounded-xl shadow-sm">
-                    <p className="text-sm text-gray-700">Fast Delivery</p>
-                  </div>
-                </div>
-              </div>
             </div>
 
-            {/* Right Column - Configuration with Claymorphism */}
+            {/* Right Column - Business Details Form */}
             <div className="space-y-6">
-              {/* Business Details Form */}
               <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
                 <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
                   <span className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mr-3 shadow-md">
@@ -607,7 +667,6 @@ const SingleBillBook = () => {
                       </label>
                       <input
                         type="text"
-                        name="companyName"
                         value={customerDetails.companyName}
                         onChange={(e) => setCustomerDetails(prev => ({ ...prev, companyName: e.target.value }))}
                         placeholder="Enter your company name"
@@ -622,7 +681,6 @@ const SingleBillBook = () => {
                       </label>
                       <input
                         type="text"
-                        name="gstNo"
                         value={customerDetails.gstNo}
                         onChange={(e) => setCustomerDetails(prev => ({ ...prev, gstNo: e.target.value }))}
                         placeholder="Enter GST number"
@@ -637,7 +695,6 @@ const SingleBillBook = () => {
                       Address <span className="text-red-500 ml-1">*</span>
                     </label>
                     <textarea
-                      name="address"
                       value={customerDetails.address}
                       onChange={(e) => setCustomerDetails(prev => ({ ...prev, address: e.target.value }))}
                       placeholder="Enter your full address"
@@ -654,7 +711,6 @@ const SingleBillBook = () => {
                       </label>
                       <input
                         type="tel"
-                        name="mobile"
                         value={customerDetails.mobile}
                         onChange={(e) => setCustomerDetails(prev => ({ ...prev, mobile: e.target.value }))}
                         placeholder="10-digit mobile"
@@ -670,7 +726,6 @@ const SingleBillBook = () => {
                       </label>
                       <input
                         type="tel"
-                        name="alternateMobile"
                         value={customerDetails.alternateMobile}
                         onChange={(e) => setCustomerDetails(prev => ({ ...prev, alternateMobile: e.target.value }))}
                         placeholder="Alternate number"
@@ -688,7 +743,6 @@ const SingleBillBook = () => {
                       </label>
                       <input
                         type="email"
-                        name="email"
                         value={customerDetails.email}
                         onChange={(e) => setCustomerDetails(prev => ({ ...prev, email: e.target.value }))}
                         placeholder="Email address"
@@ -703,7 +757,6 @@ const SingleBillBook = () => {
                       </label>
                       <input
                         type="url"
-                        name="companyWebsite"
                         value={customerDetails.companyWebsite}
                         onChange={(e) => setCustomerDetails(prev => ({ ...prev, companyWebsite: e.target.value }))}
                         placeholder="https://example.com"
@@ -719,7 +772,6 @@ const SingleBillBook = () => {
                     </label>
                     <input
                       type="text"
-                      name="panNumber"
                       value={customerDetails.panNumber}
                       onChange={(e) => setCustomerDetails(prev => ({ ...prev, panNumber: e.target.value }))}
                       placeholder="Enter PAN number"
@@ -737,7 +789,7 @@ const SingleBillBook = () => {
                         <div className="w-full p-3 bg-white/50 backdrop-blur-sm border-2 border-dashed border-indigo-300 rounded-xl text-center hover:bg-white/70 transition-all duration-300">
                           <FaUpload className="mx-auto text-indigo-600 mb-1" />
                           <span className="text-sm text-gray-600">
-                            {customerDetails.logo ? customerDetails.logo.name : "Click to upload logo"}
+                            {customerDetails.logo && typeof customerDetails.logo !== 'string' ? customerDetails.logo.name : (customerDetails.logo ? "Logo selected" : "Click to upload logo")}
                           </span>
                           <input
                             type="file"
@@ -756,7 +808,6 @@ const SingleBillBook = () => {
                       Special Instructions
                     </label>
                     <textarea
-                      name="description"
                       value={customerDetails.description}
                       onChange={(e) => setCustomerDetails(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="Any special instructions or notes for your order..."
@@ -765,7 +816,6 @@ const SingleBillBook = () => {
                     />
                   </div>
 
-                  {/* Save Details Button */}
                   <button
                     onClick={handleSaveBusinessDetails}
                     disabled={isSavingDetails}
@@ -860,7 +910,6 @@ const SingleBillBook = () => {
                   </div>
                 </div>
 
-                {/* Delivery Check */}
                 <div className="mb-4">
                   <div className="flex">
                     <input
@@ -886,7 +935,6 @@ const SingleBillBook = () => {
                   )}
                 </div>
 
-                {/* Add to Cart Button */}
                 <button
                   onClick={handleAddToCart}
                   disabled={isAddingToCart}
@@ -913,7 +961,6 @@ const SingleBillBook = () => {
             </div>
           </div>
 
-          {/* Features Section with Claymorphism */}
           <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6">
             {promiseData.map((item, index) => (
               <div key={index} className="backdrop-blur-sm bg-white/40 rounded-2xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300 transform hover:-translate-y-1">
@@ -934,7 +981,6 @@ const SingleBillBook = () => {
       {showPreviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fadeIn">
           <div className="relative max-w-5xl w-full max-h-[90vh] bg-gradient-to-br from-white to-gray-100 rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
-            {/* Modal Header */}
             <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-600 to-purple-600">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
                 <FaEye className="text-white" />
@@ -965,7 +1011,6 @@ const SingleBillBook = () => {
               </div>
             </div>
             
-            {/* Modal Body */}
             <div className="p-6 overflow-auto max-h-[calc(90vh-80px)]">
               {previewError ? (
                 <div className="text-center py-12">
@@ -984,7 +1029,6 @@ const SingleBillBook = () => {
               )}
             </div>
             
-            {/* Modal Footer */}
             <div className="p-4 border-t border-gray-200 bg-gray-50/50">
               <p className="text-center text-sm text-gray-600">
                 This is how your bill book will look after printing
@@ -998,82 +1042,31 @@ const SingleBillBook = () => {
 
       <style jsx>{`
         @keyframes fadeIn {
-          from {
-            opacity: 0;
-          }
-          to {
-            opacity: 1;
-          }
+          from { opacity: 0; }
+          to { opacity: 1; }
         }
-        
         @keyframes scaleIn {
-          from {
-            transform: scale(0.9);
-            opacity: 0;
-          }
-          to {
-            transform: scale(1);
-            opacity: 1;
-          }
+          from { transform: scale(0.9); opacity: 0; }
+          to { transform: scale(1); opacity: 1; }
         }
-        
         @keyframes slideIn {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
         }
-        
-        .animate-fadeIn {
-          animation: fadeIn 0.3s ease-out;
-        }
-        
-        .animate-scaleIn {
-          animation: scaleIn 0.3s ease-out;
-        }
-        
-        .animate-slideIn {
-          animation: slideIn 0.3s ease-out;
-        }
+        .animate-fadeIn { animation: fadeIn 0.3s ease-out; }
+        .animate-scaleIn { animation: scaleIn 0.3s ease-out; }
+        .animate-slideIn { animation: slideIn 0.3s ease-out; }
       `}</style>
     </div>
   );
 };
 
 const options = {
-  billBooks: [
-    "A4 Bill Book",
-    "A5 Bill Book", 
-    "Duplicate Bill Book",
-    "Triplicate Bill Book",
-    "All Originals Bill Book"
-  ],
-  billBookTypes: [
-    "A4 Size - 21cm x 29.7cm",
-    "A5 Size - 14.8cm x 21cm"
-  ],
-  bookContains: [
-    "50 SET - 50 Originals + 50 Duplicates",
-    "50 SET - 50 Originals + 50 Duplicates + 50 Triplicates",
-    "100 SET - 100 Originals + 100 Duplicates",
-    "100 Originals Only",
-    "200 Originals Only"
-  ],
-  paperTypes: [
-    "90 GSM Maplitho (Original)",
-    "70 GSM Maplitho (Duplicate)",
-    "70 GSM Maplitho (Triplicate)",
-    "Multicolor Printing"
-  ],
-  serialNumbers: [
-    "Sequential Numbering",
-    "Custom Starting Number",
-    "No Serial Number"
-  ]
+  billBooks: ["A4 Bill Book", "A5 Bill Book", "Duplicate Bill Book", "Triplicate Bill Book", "All Originals Bill Book"],
+  billBookTypes: ["A4 Size - 21cm x 29.7cm", "A5 Size - 14.8cm x 21cm"],
+  bookContains: ["50 SET - 50 Originals + 50 Duplicates", "50 SET - 50 Originals + 50 Duplicates + 50 Triplicates", "100 SET - 100 Originals + 100 Duplicates", "100 Originals Only", "200 Originals Only"],
+  paperTypes: ["90 GSM Maplitho (Original)", "70 GSM Maplitho (Duplicate)", "70 GSM Maplitho (Triplicate)", "Multicolor Printing"],
+  serialNumbers: ["Sequential Numbering", "Custom Starting Number", "No Serial Number"]
 };
 
 export default SingleBillBook;
