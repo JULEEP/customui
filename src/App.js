@@ -25,7 +25,7 @@ import SingleLetterhead from "./Pages/SingleLetterhead";
 import VisitingCardList from "./Pages/VisitingCardList";
 import SingleVisitingCard from "./Pages/SingleVisitingCard";
 import PrescriptionPadList from "./Pages/PrescriptionPadList";
-import SinglePrescriptionPad from "./Pages/SinglePrescriptionPad";
+import SingleDoctorPrescription from "./Pages/SinglePrescriptionPad";
 import CashReceiptList from "./Pages/CashReceiptList";
 import CashReceiptDesignPage from "./Pages/CashReceiptDesignPage";
 import Cart from "./Pages/EmptyCartPage";
@@ -57,7 +57,7 @@ function App() {
         <Route path="/visitingcards" element={<VisitingCardList />} />
         <Route path="/visitingcard/:id" element={<SingleVisitingCard />} />
         <Route path="/prescriptionpads" element={<PrescriptionPadList />} />
-        <Route path="/prescriptionpad/:id" element={<SinglePrescriptionPad />} />
+        <Route path="/prescriptionpad/:id" element={<SingleDoctorPrescription />} />
         <Route path="/receipts" element={<CashReceiptList />} />
         <Route path="/receipt/:id" element={<CashReceiptDesignPage />} />
         <Route path="/cart" element={<Cart />} />

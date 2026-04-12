@@ -1,261 +1,261 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import axios from "axios";
+import { Eye, Search, Stethoscope } from "lucide-react";
+import Navbar from "../Pages/Navbar";
 
 const PrescriptionPadList = () => {
   const navigate = useNavigate();
-  
-  const prescriptionPadProducts = [
-    { 
-      id: 1, 
-      name: "Standard Prescription Pad", 
-      price: "₹750/-", 
-      description: "Standard prescription pads for doctors and clinics",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 2, 
-      name: "Premium Prescription Pad", 
-      price: "₹950/-", 
-      description: "Premium quality prescription pads with better paper",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 3, 
-      name: "Hospital Prescription Pad", 
-      price: "₹1,200/-", 
-      description: "Prescription pads specifically for hospitals",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 4, 
-      name: "Clinic Prescription Pad", 
-      price: "₹850/-", 
-      description: "Prescription pads designed for medical clinics",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 5, 
-      name: "Dental Prescription Pad", 
-      price: "₹900/-", 
-      description: "Special prescription pads for dental clinics",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 6, 
-      name: "Veterinary Prescription Pad", 
-      price: "₹800/-", 
-      description: "Prescription pads for veterinary doctors",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 7, 
-      name: "Custom Prescription Pad", 
-      price: "From ₹1,000/-", 
-      description: "Fully customized prescription pads with your clinic details",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 8, 
-      name: "Carbonless Prescription Pad", 
-      price: "₹1,100/-", 
-      description: "Carbonless duplicate prescription pads",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 9, 
-      name: "Bulk Prescription Pad Pack", 
-      price: "₹3,500/-", 
-      description: "Pack of 50 prescription pads",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-    { 
-      id: 10, 
-      name: "Emergency Prescription Pad", 
-      price: "₹700/-", 
-      description: "Emergency prescription pads for quick use",
-      image: "https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-    },
-  ];
+  const [prescriptionPads, setPrescriptionPads] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [searchTerm, setSearchTerm] = useState("");
 
-  const handleStartDesign = (productId = 1) => {
-    navigate(`/prescriptionpad/${productId}`);
+  const API_URL = "https://designback.onrender.com/api/admin/doctorprescriptions";
+
+  const fetchPrescriptionPads = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get(`${API_URL}?search=${searchTerm}`);
+      if (response.data.success) {
+        setPrescriptionPads(response.data.data);
+      } else {
+        setError("Failed to fetch prescription pads");
+      }
+    } catch (err) {
+      console.error("Error fetching prescription pads:", err);
+      setError(err.response?.data?.message || "Error fetching prescription pads");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-gray-50 to-white py-12 px-4">
-      <div className="max-w-7xl mx-auto">
-        {/* Header Section */}
-        <div className="mb-12 bg-gradient-to-r from-teal-50 to-blue-50 rounded-2xl p-8 border border-teal-100">
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="flex-1">
-              <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                PRESCRIPTION PAD TEMPLATES
-              </h1>
-              <p className="text-gray-700 text-lg mb-6">
-                Professional prescription pads for doctors, clinics, and hospitals. Customizable with your clinic details, logo, and contact information. Perfect for maintaining professional standards and ensuring clear communication with patients.
-              </p>
-              <button 
-                onClick={() => handleStartDesign(1)}
-                className="bg-gradient-to-r from-teal-600 to-teal-700 text-white font-bold py-3 px-8 rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all duration-300 shadow-md hover:shadow-lg flex items-center gap-2"
+  useEffect(() => {
+    fetchPrescriptionPads();
+  }, [searchTerm]);
+
+  const handleViewDetails = (padId) => {
+    navigate(`/prescriptionpad/${padId}`);
+  };
+
+  // Random price generator (since API doesn't have price field)
+  const getRandomPrice = () => {
+    const prices = ["₹750/-", "₹850/-", "₹950/-", "₹1,100/-", "₹1,250/-", "₹1,500/-"];
+    return prices[Math.floor(Math.random() * prices.length)];
+  };
+
+  if (loading) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 py-12 px-4 flex items-center justify-center">
+          <div className="text-center">
+            <div className="relative">
+              <div className="inline-block animate-spin rounded-full h-16 w-16 border-4 border-teal-500 border-t-transparent shadow-lg"></div>
+            </div>
+            <p className="mt-6 text-gray-600 font-medium">Loading prescription pads...</p>
+          </div>
+        </div>
+      </>
+    );
+  }
+
+  if (error) {
+    return (
+      <>
+        <Navbar />
+        <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 py-12 px-4">
+          <div className="max-w-7xl mx-auto">
+            <div className="bg-gradient-to-r from-red-50 to-red-100 border border-red-200 rounded-2xl p-8 text-center shadow-xl">
+              <div className="text-red-600 text-6xl mb-4">⚠️</div>
+              <h2 className="text-2xl font-bold text-red-700 mb-3">Error Loading Prescription Pads</h2>
+              <p className="text-red-600 mb-6">{error}</p>
+              <button
+                onClick={fetchPrescriptionPads}
+                className="bg-gradient-to-r from-red-500 to-red-600 text-white px-8 py-3 rounded-xl font-semibold hover:from-red-600 hover:to-red-700 transition-all duration-300 shadow-lg"
               >
-                Start Design
-                <span className="text-xl">→</span>
+                Try Again 🔄
               </button>
             </div>
-            <div className="w-full md:w-1/3">
-              <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-                <div className="flex items-center justify-center h-64 bg-gradient-to-br from-teal-50 to-gray-100 rounded-lg overflow-hidden">
-                  <img
-                    src="https://cdn.printshoppy.com/image/cache/catalog/product-image/stationery/prescription/prescription-153-600x800.webp"
-                    alt="Prescription Pad Template"
-                    className="max-h-full max-w-full object-contain drop-shadow-lg"
-                  />
-                </div>
-              </div>
-            </div>
           </div>
         </div>
+      </>
+    );
+  }
 
-        {/* Product Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          {prescriptionPadProducts.map((product) => (
-            <div 
-              key={product.id}
-              className="group bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-sm hover:shadow-xl transition-all duration-300 transform hover:-translate-y-1"
-            >
-              {/* Product Image */}
-              <div className="relative h-64 bg-gradient-to-br from-teal-50 to-gray-100 overflow-hidden">
-                <div className="absolute inset-0 flex items-center justify-center p-6">
-                  <img
-                    src={product.image}
-                    alt={product.name}
-                    className="max-h-full max-w-full object-contain drop-shadow-lg group-hover:scale-105 transition-transform duration-300"
-                  />
-                </div>
-                
-                {/* Gradient overlay corners */}
-                <div className="absolute top-0 left-0 w-20 h-20 bg-gradient-to-br from-teal-200 to-transparent opacity-30 rounded-br-full"></div>
-                <div className="absolute bottom-0 right-0 w-20 h-20 bg-gradient-to-tl from-blue-200 to-transparent opacity-30 rounded-tl-full"></div>
-                
-                {/* Price Tag */}
-                <div className="absolute top-4 right-4 bg-gradient-to-r from-teal-600 to-blue-600 text-white px-4 py-2 rounded-full font-bold shadow-lg">
-                  {product.price}
-                </div>
-              </div>
-
-              {/* Product Info */}
-              <div className="p-6">
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  {product.name}
-                </h3>
-                <p className="text-gray-600 mb-4 text-sm">
-                  {product.description}
+  return (
+    <>
+      <Navbar />
+      <div className="min-h-screen bg-gradient-to-br from-gray-50 via-gray-100 to-gray-200 py-12 px-4">
+        <div className="max-w-7xl mx-auto">
+          {/* Header Section */}
+          <div className="mb-12 bg-gradient-to-r from-teal-500/10 via-blue-500/10 to-teal-500/10 backdrop-blur-sm rounded-2xl p-8 border border-white/20 shadow-2xl">
+            <div className="flex flex-col md:flex-row items-center gap-8">
+              <div className="flex-1 text-center md:text-left">
+                <h1 className="text-5xl font-bold bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent mb-4">
+                  PRESCRIPTION PAD TEMPLATES
+                </h1>
+                <p className="text-gray-700 text-lg leading-relaxed">
+                  Professional prescription pads for doctors, clinics, and hospitals. 
+                  Customizable with your clinic details, logo, and contact information.
                 </p>
-                
-                {/* Action Button - Only Start Design */}
-                <div className="mt-6">
-                  <button 
-                    onClick={() => handleStartDesign(product.id)}
-                    className="w-full bg-gradient-to-r from-teal-600 to-teal-700 text-white font-bold py-3 rounded-lg hover:from-teal-700 hover:to-teal-800 transition-all duration-300 shadow-md hover:shadow-lg"
-                  >
-                    Start Design
-                  </button>
+              </div>
+              <div className="w-full md:w-1/3">
+                <div className="bg-white/30 backdrop-blur-md rounded-2xl p-6 border border-white/40 shadow-xl">
+                  <div className="flex items-center justify-center h-40 bg-gradient-to-br from-teal-100 to-blue-100 rounded-xl overflow-hidden relative">
+                    <Stethoscope className="w-28 h-28 text-teal-500 drop-shadow-2xl" />
+                  </div>
                 </div>
               </div>
             </div>
-          ))}
-        </div>
+          </div>
 
-        {/* Medical Specialties Section */}
-        <div className="mt-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">
-            FOR MEDICAL SPECIALTIES
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="bg-gradient-to-r from-teal-50 to-white rounded-xl p-6 border border-teal-100">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-teal-100 rounded-full flex items-center justify-center">
-                  <span className="text-teal-600 text-lg">👨‍⚕️</span>
-                </div>
-                <h3 className="font-bold text-gray-900">General Physicians</h3>
+          {/* Search Bar */}
+          <div className="mb-10">
+            <div className="max-w-md mx-auto">
+              <div className="relative group">
+                <input
+                  type="text"
+                  placeholder="Search prescription pads..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full px-6 py-4 pl-14 pr-4 text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent shadow-lg transition-all duration-300"
+                />
+                <Search className="absolute left-5 top-4 h-6 w-6 text-teal-500" />
               </div>
-              <p className="text-gray-600 text-sm">Standard prescription pads for general practitioners.</p>
-            </div>
-            
-            <div className="bg-gradient-to-r from-blue-50 to-white rounded-xl p-6 border border-blue-100">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                  <span className="text-blue-600 text-lg">👩‍⚕️</span>
-                </div>
-                <h3 className="font-bold text-gray-900">Specialists</h3>
-              </div>
-              <p className="text-gray-600 text-sm">Custom pads for cardiologists, neurologists, etc.</p>
-            </div>
-            
-            <div className="bg-gradient-to-r from-green-50 to-white rounded-xl p-6 border border-green-100">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
-                  <span className="text-green-600 text-lg">🏥</span>
-                </div>
-                <h3 className="font-bold text-gray-900">Hospitals</h3>
-              </div>
-              <p className="text-gray-600 text-sm">Hospital-grade prescription pads with multiple copies.</p>
-            </div>
-            
-            <div className="bg-gradient-to-r from-purple-50 to-white rounded-xl p-6 border border-purple-100">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center">
-                  <span className="text-purple-600 text-lg">🦷</span>
-                </div>
-                <h3 className="font-bold text-gray-900">Dental Clinics</h3>
-              </div>
-              <p className="text-gray-600 text-sm">Special prescription pads for dental procedures.</p>
             </div>
           </div>
-        </div>
 
-        {/* Features Section */}
-        <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-            <div className="w-12 h-12 bg-teal-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-teal-600 text-xl">📋</span>
+          {/* Product Grid - Only Image, Price & Button */}
+          {prescriptionPads.length === 0 ? (
+            <div className="text-center py-16 bg-white/30 backdrop-blur-sm rounded-2xl">
+              <div className="text-gray-400 text-6xl mb-4">📋</div>
+              <h3 className="text-2xl font-semibold text-gray-700 mb-3">No Prescription Pads Found</h3>
+              <p className="text-gray-500">No prescription pads available at the moment.</p>
             </div>
-            <h3 className="font-bold text-gray-900 mb-2">Professional Design</h3>
-            <p className="text-gray-600">Clean, professional layouts with all necessary medical fields.</p>
-          </div>
-          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-green-600 text-xl">⚡</span>
-            </div>
-            <h3 className="font-bold text-gray-900 mb-2">Fast Delivery</h3>
-            <p className="text-gray-600">Get your prescription pads delivered within 5-7 business days.</p>
-          </div>
-          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-            <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-              <span className="text-blue-600 text-xl">🎨</span>
-            </div>
-            <h3 className="font-bold text-gray-900 mb-2">Custom Details</h3>
-            <p className="text-gray-600">Add your clinic name, address, phone, logo, and registration details.</p>
-          </div>
-        </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+              {prescriptionPads.map((pad, index) => (
+                <div 
+                  key={pad._id}
+                  className="group bg-white rounded-2xl overflow-hidden border border-gray-200 shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2"
+                >
+                  {/* Preview Image Only */}
+                  <div className="relative h-64 bg-gradient-to-br from-teal-100 to-blue-100 overflow-hidden">
+                    {pad.previewImage ? (
+                      <img
+                        src={`https://designback.onrender.com${pad.previewImage}`}
+                        alt="Prescription Pad"
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                        onError={(e) => {
+                          e.target.src = "https://via.placeholder.com/400x300?text=No+Preview";
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <Stethoscope className="w-20 h-20 text-teal-300" />
+                      </div>
+                    )}
+                    
+                    {/* Price Badge */}
+                    <div className="absolute top-4 right-4">
+                      <div className="bg-gradient-to-r from-teal-500 to-blue-500 text-white px-4 py-2 rounded-full font-bold shadow-lg">
+                        {getRandomPrice()}
+                      </div>
+                    </div>
+                  </div>
 
-        {/* CTA Section */}
-        <div className="mt-16 bg-gradient-to-r from-teal-600 to-blue-600 rounded-2xl p-8 text-center text-white">
-          <h2 className="text-2xl font-bold mb-4">
-            Ready to Design Your Prescription Pad?
-          </h2>
-          <p className="mb-6 opacity-90 max-w-2xl mx-auto">
-            Create professional prescription pads that reflect your medical practice. Customize with your clinic details, choose paper quality, and add security features.
-          </p>
-          <button 
-            onClick={() => handleStartDesign(1)}
-            className="bg-white text-teal-600 font-bold py-3 px-8 rounded-lg hover:bg-gray-100 transition-colors duration-300 shadow-lg hover:shadow-xl"
-          >
-            Start Custom Design Now
-          </button>
+                  {/* Only View Details Button */}
+                  <div className="p-5">
+                    <button 
+                      onClick={() => handleViewDetails(pad._id)}
+                      className="relative w-full bg-gradient-to-r from-teal-500 via-teal-600 to-blue-600 text-white font-semibold py-3 rounded-xl transition-all duration-300 shadow-lg hover:shadow-xl transform hover:-translate-y-0.5 overflow-hidden group flex items-center justify-center gap-2"
+                    >
+                      <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/30 to-white/0 -translate-x-full group-hover:translate-x-full transition-all duration-700"></div>
+                      <Eye className="w-5 h-5" />
+                      <span>View Details</span>
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {/* Medical Specialties Section */}
+          <div className="mt-16">
+            <h2 className="text-3xl font-bold text-center mb-8 bg-gradient-to-r from-teal-600 to-blue-600 bg-clip-text text-transparent">
+              FOR MEDICAL SPECIALTIES
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="group bg-gradient-to-br from-teal-50 to-white rounded-xl p-6 border border-teal-100 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-teal-400 to-teal-500 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-white text-xl">👨‍⚕️</span>
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-lg">General Physicians</h3>
+                </div>
+                <p className="text-gray-600 text-sm">Standard prescription pads for general practitioners.</p>
+              </div>
+              
+              <div className="group bg-gradient-to-br from-blue-50 to-white rounded-xl p-6 border border-blue-100 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-white text-xl">👩‍⚕️</span>
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-lg">Specialists</h3>
+                </div>
+                <p className="text-gray-600 text-sm">Custom pads for cardiologists, neurologists, etc.</p>
+              </div>
+              
+              <div className="group bg-gradient-to-br from-green-50 to-white rounded-xl p-6 border border-green-100 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-green-500 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-white text-xl">🏥</span>
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-lg">Hospitals</h3>
+                </div>
+                <p className="text-gray-600 text-sm">Hospital-grade prescription pads with multiple copies.</p>
+              </div>
+              
+              <div className="group bg-gradient-to-br from-purple-50 to-white rounded-xl p-6 border border-purple-100 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1 cursor-pointer">
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-purple-400 to-purple-500 rounded-full flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <span className="text-white text-xl">🦷</span>
+                  </div>
+                  <h3 className="font-bold text-gray-900 text-lg">Dental Clinics</h3>
+                </div>
+                <p className="text-gray-600 text-sm">Special prescription pads for dental procedures.</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Features Section */}
+          <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="group bg-white/40 backdrop-blur-sm rounded-xl p-6 border border-white/50 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <div className="w-14 h-14 bg-gradient-to-br from-teal-400 to-teal-500 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <span className="text-white text-2xl">📋</span>
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">Professional Design</h3>
+              <p className="text-gray-600">Clean, professional layouts with all necessary medical fields.</p>
+            </div>
+            <div className="group bg-white/40 backdrop-blur-sm rounded-xl p-6 border border-white/50 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <div className="w-14 h-14 bg-gradient-to-br from-green-400 to-green-500 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <span className="text-white text-2xl">⚡</span>
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">Fast Delivery</h3>
+              <p className="text-gray-600">Get your prescription pads delivered within 5-7 business days.</p>
+            </div>
+            <div className="group bg-white/40 backdrop-blur-sm rounded-xl p-6 border border-white/50 shadow-lg hover:shadow-2xl transition-all duration-300 transform hover:-translate-y-1">
+              <div className="w-14 h-14 bg-gradient-to-br from-blue-400 to-blue-500 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300">
+                <span className="text-white text-2xl">🎨</span>
+              </div>
+              <h3 className="font-bold text-gray-900 text-lg mb-2">Custom Details</h3>
+              <p className="text-gray-600">Add your clinic name, address, phone, logo, and registration details.</p>
+            </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
