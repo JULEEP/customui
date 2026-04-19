@@ -1,4 +1,3 @@
-// SingleDoctorPrescription.jsx
 import React, { useState, useEffect, useCallback } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import Navbar from "./Navbar";
@@ -6,10 +5,10 @@ import Footer from "./Footer";
 import { 
   FaStar, FaShippingFast, FaUndo, 
   FaSave, FaSpinner, FaShoppingCart, FaArrowRight,
-  FaCheckCircle, FaShieldAlt, FaHeart, FaBuilding,
-  FaMapMarkerAlt, FaPhone, FaEnvelope, FaTag,
+  FaCheckCircle, FaShieldAlt, FaHeart,
+  FaMapMarkerAlt, FaPhone, 
   FaArrowLeft, FaPalette, FaLayerGroup, FaPrint, FaBarcode,
-  FaEye, FaTimes, FaDownload, FaShare, FaUpload, FaGlobeAsia, FaIdCard,
+  FaEye, FaTimes, FaDownload, FaShare, FaUpload,
   FaUserMd, FaGraduationCap, FaHospital, FaClock, FaRegIdCard
 } from "react-icons/fa";
 import { toast, Toaster } from 'react-hot-toast';
@@ -18,7 +17,6 @@ const SingleDoctorPrescription = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  // Doctor Details State (like business details in bill book)
   const [doctorDetails, setDoctorDetails] = useState({
     doctorName: "",
     qualification: "",
@@ -43,6 +41,7 @@ const SingleDoctorPrescription = () => {
   const [imageError, setImageError] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
@@ -52,71 +51,71 @@ const SingleDoctorPrescription = () => {
 
   const API_BASE_URL = "https://designback.onrender.com";
 
-  // Get user ID from localStorage
   const getUserIdFromStorage = useCallback(() => {
     const userData = localStorage.getItem("user");
     if (userData) {
       try {
         const user = JSON.parse(userData);
-        if (user.id) {
-          return user.id;
-        }
+        if (user.id) return user.id;
       } catch (e) {
         console.error("Error parsing user data:", e);
       }
     }
-    
     const userIdFromStorage = localStorage.getItem("userId");
-    if (userIdFromStorage) {
-      return userIdFromStorage;
-    }
-    
+    if (userIdFromStorage) return userIdFromStorage;
     return null;
   }, []);
 
-  // Check if user is logged in
   const checkAuth = useCallback(() => {
     const token = localStorage.getItem("token");
     const uid = getUserIdFromStorage();
-    
     if (!token || !uid) {
       toast.error("Please login to continue");
       navigate("/login");
       return false;
     }
-    
     setUserId(uid);
     return true;
   }, [navigate, getUserIdFromStorage]);
 
-  // Fetch prescription template details
+  const fetchSavedDoctorDetails = useCallback(async () => {
+    if (!userId) return;
+    setIsFetchingDetails(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/api/auth/doctor-details/${userId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.success && result.data.doctorDetails) {
+        const savedDetails = result.data.doctorDetails;
+        setDoctorDetails(prev => ({
+          ...prev,
+          doctorName: savedDetails.doctorName || "",
+          qualification: savedDetails.qualification || "",
+          hospitalName: savedDetails.hospitalName || "",
+          address: savedDetails.address || "",
+          phone: savedDetails.phone || "",
+          registrationNo: savedDetails.registrationNo || "",
+          timing: savedDetails.timing || "",
+          logo: savedDetails.logo || null
+        }));
+      }
+    } catch (err) {
+      console.error("Error fetching saved doctor details:", err);
+    } finally {
+      setIsFetchingDetails(false);
+    }
+  }, [userId]);
+
   const fetchPrescription = useCallback(async () => {
     try {
       setLoading(true);
       const response = await fetch(`${API_BASE_URL}/api/admin/doctor-prescription/${id}`);
-      
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-      
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       const result = await response.json();
-      
       if (result.success) {
         setPrescription(result.data);
-        // Pre-fill doctor details from template if available
-        if (result.data) {
-          setDoctorDetails(prev => ({
-            ...prev,
-            doctorName: result.data.doctorName || "",
-            qualification: result.data.qualification || "",
-            hospitalName: result.data.hospitalName || "",
-            address: result.data.address || "",
-            phone: result.data.phone || "",
-            registrationNo: result.data.registrationNo || "",
-            timing: result.data.timing || "",
-            logo: result.data.logo || null
-          }));
-        }
       } else {
         throw new Error("Failed to fetch prescription pad");
       }
@@ -128,7 +127,6 @@ const SingleDoctorPrescription = () => {
     }
   }, [id]);
 
-  // Save doctor details
   const handleSaveDoctorDetails = async () => {
     if (!userId) {
       toast.error("Please login first");
@@ -165,9 +163,7 @@ const SingleDoctorPrescription = () => {
 
       const response = await fetch(`${API_BASE_URL}/api/auth/doctor-details/${userId}`, {
         method: 'POST',
-        headers: {
-          "Authorization": `Bearer ${token}`
-        },
+        headers: { "Authorization": `Bearer ${token}` },
         body: formData
       });
 
@@ -177,6 +173,7 @@ const SingleDoctorPrescription = () => {
         toast.success("Doctor details saved successfully!");
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 3000);
+        fetchSavedDoctorDetails();
       } else {
         throw new Error(result.message || "Failed to save details");
       }
@@ -221,13 +218,14 @@ const SingleDoctorPrescription = () => {
       setPreviewError(null);
       
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/api/auth/getprescriptionpreview/${userId}/${id}`, {
-        method: "POST",
+      
+      // Using GET API call as specified
+      const response = await fetch(`${API_BASE_URL}/api/auth/singleprescription/${userId}/${id}`, {
+        method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
-        },
-        body: JSON.stringify(doctorDetails)
+        }
       });
       
       if (!response.ok) {
@@ -412,42 +410,41 @@ const SingleDoctorPrescription = () => {
     serialNumbers: ["Sequential Numbering", "Custom Starting Number", "No Serial Number"]
   };
 
-  // Initialize
   useEffect(() => {
     if (!checkAuth()) return;
     fetchPrescription();
   }, [checkAuth, fetchPrescription]);
 
-  if (!userId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] to-[#cfdef3]">
-        <Navbar />
-        <div className="flex justify-center items-center h-screen">
-          <div className="text-center backdrop-blur-sm bg-white/40 p-8 rounded-3xl shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 max-w-md">
-            <div className="text-yellow-500 text-4xl mb-4">⚠️</div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">Please Login</h3>
-            <p className="text-gray-700 mb-4">You need to login first to view and purchase prescription pads.</p>
-            <button
-              onClick={() => navigate("/login")}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-xl transition-all duration-300"
-            >
-              Go to Login
-            </button>
-          </div>
-        </div>
-        <Footer />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (userId) {
+      fetchSavedDoctorDetails();
+    }
+  }, [userId, fetchSavedDoctorDetails]);
 
-  if (loading) {
+  if (!userId || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] to-[#cfdef3]">
         <Navbar />
         <div className="flex justify-center items-center h-screen">
-          <div className="text-center backdrop-blur-sm bg-white/30 p-8 rounded-3xl shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff]">
-            <FaSpinner className="animate-spin text-4xl text-indigo-600 mx-auto mb-4" />
-            <p className="text-gray-700">Loading prescription pad details...</p>
+          <div className="text-center backdrop-blur-sm bg-white/40 p-8 rounded-3xl shadow-xl">
+            {loading ? (
+              <>
+                <FaSpinner className="animate-spin text-4xl text-indigo-600 mx-auto mb-4" />
+                <p className="text-gray-700">Loading prescription pad details...</p>
+              </>
+            ) : (
+              <>
+                <div className="text-yellow-500 text-4xl mb-4">⚠️</div>
+                <h3 className="text-xl font-bold text-gray-800 mb-2">Please Login</h3>
+                <p className="text-gray-700 mb-4">You need to login first to view and purchase prescription pads.</p>
+                <button
+                  onClick={() => navigate("/login")}
+                  className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-full"
+                >
+                  Go to Login
+                </button>
+              </>
+            )}
           </div>
         </div>
         <Footer />
@@ -460,13 +457,13 @@ const SingleDoctorPrescription = () => {
       <div className="min-h-screen bg-gradient-to-br from-[#e0eafc] to-[#cfdef3]">
         <Navbar />
         <div className="flex justify-center items-center h-screen">
-          <div className="text-center backdrop-blur-sm bg-white/40 p-8 rounded-3xl shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 max-w-md">
+          <div className="text-center backdrop-blur-sm bg-white/40 p-8 rounded-3xl shadow-xl max-w-md">
             <div className="text-red-500 text-4xl mb-4">⚠️</div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">Error Loading Prescription Pad</h3>
             <p className="text-gray-700 mb-4">{error || "Prescription pad not found"}</p>
             <button
-              onClick={() => navigate("/prescriptions")}
-              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-full hover:shadow-xl transition-all duration-300"
+              onClick={() => navigate("/prescriptionpads")}
+              className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-6 py-2 rounded-full"
             >
               Back to Prescription Pads
             </button>
@@ -484,11 +481,11 @@ const SingleDoctorPrescription = () => {
 
       {showSuccessPopup && (
         <div className="fixed top-20 right-4 z-50 animate-slideIn">
-          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3 backdrop-blur-sm">
+          <div className="bg-gradient-to-r from-green-500 to-emerald-500 text-white px-6 py-4 rounded-2xl shadow-2xl flex items-center gap-3">
             <FaCheckCircle className="text-2xl" />
             <div>
               <p className="font-bold">Success!</p>
-              <p className="text-sm">Your doctor details have been saved. You can now view the preview!</p>
+              <p className="text-sm">Your doctor details have been saved!</p>
             </div>
           </div>
         </div>
@@ -497,8 +494,8 @@ const SingleDoctorPrescription = () => {
       <div className="pt-24 pb-16 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <button
-            onClick={() => navigate("/prescriptions")}
-            className="flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-medium backdrop-blur-sm bg-white/30 px-5 py-2.5 rounded-2xl shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] hover:shadow-[4px_4px_8px_#b8b9be,_-4px_-4px_8px_#ffffff] transition-all duration-300 mb-8 group"
+            onClick={() => navigate("/prescriptionpads")}
+            className="flex items-center gap-2 text-indigo-700 hover:text-indigo-900 font-medium backdrop-blur-sm bg-white/30 px-5 py-2.5 rounded-2xl shadow-lg mb-8 group"
           >
             <FaArrowLeft className="transform group-hover:-translate-x-1 transition-transform" />
             Back to Prescription Pads
@@ -507,7 +504,7 @@ const SingleDoctorPrescription = () => {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Left Column - Template Preview */}
             <div className="space-y-6">
-              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-xl border border-white/50">
                 <div className="relative bg-gradient-to-br from-white/60 to-gray-100/60 rounded-2xl p-4 mb-4 min-h-[400px] flex items-center justify-center shadow-inner">
                   <img
                     src={getImageUrl()}
@@ -525,7 +522,7 @@ const SingleDoctorPrescription = () => {
                 <button
                   onClick={fetchPreviewImage}
                   disabled={previewLoading}
-                  className="w-full mt-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center gap-2 hover:from-purple-700 hover:to-pink-700 group"
+                  className="w-full mt-4 py-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 hover:from-purple-700 hover:to-pink-700 transition-all duration-300"
                 >
                   {previewLoading ? (
                     <>
@@ -534,16 +531,16 @@ const SingleDoctorPrescription = () => {
                     </>
                   ) : (
                     <>
-                      <FaEye className="transform group-hover:scale-110 transition-transform" />
+                      <FaEye />
                       VIEW FULL PREVIEW
-                      <FaArrowRight className="transform group-hover:translate-x-1 transition-transform" />
+                      <FaArrowRight />
                     </>
                   )}
                 </button>
               </div>
 
               {/* Design Features Section */}
-              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-xl border border-white/50">
                 <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center">
                   <FaPalette className="mr-2 text-purple-600" />
                   Design Features
@@ -563,17 +560,6 @@ const SingleDoctorPrescription = () => {
                       <span className="text-xs">{prescription.design?.textColor}</span>
                     </div>
                   </div>
-                  <div className="flex items-center justify-between p-2 backdrop-blur-sm bg-white/30 rounded-xl">
-                    <span className="text-sm text-gray-600">Accent Color</span>
-                    <div className="flex items-center">
-                      <div className="w-4 h-4 rounded-full mr-1" style={{ backgroundColor: prescription.design?.accentColor }}></div>
-                      <span className="text-xs">{prescription.design?.accentColor}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between p-2 backdrop-blur-sm bg-white/30 rounded-xl">
-                    <span className="text-sm text-gray-600">Font Family</span>
-                    <span className="text-xs font-semibold">{prescription.design?.fontFamily}</span>
-                  </div>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
                   {prescription.design?.roundedCorners && (
@@ -582,19 +568,13 @@ const SingleDoctorPrescription = () => {
                   {prescription.design?.shadow && (
                     <span className="text-xs px-2 py-1 bg-blue-500/20 text-blue-700 rounded-full">Shadow Effect</span>
                   )}
-                  {prescription.design?.border && (
-                    <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-700 rounded-full">Border</span>
-                  )}
-                  {prescription.logoSettings?.show && (
-                    <span className="text-xs px-2 py-1 bg-orange-500/20 text-orange-700 rounded-full">Logo Area</span>
-                  )}
                 </div>
               </div>
             </div>
 
-            {/* Right Column - Doctor Details Form (Like Business Details) */}
+            {/* Right Column - Doctor Details Form */}
             <div className="space-y-6">
-              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-xl border border-white/50">
                 <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
                   <span className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-full flex items-center justify-center mr-3 shadow-md">
                     <span className="text-white font-bold text-sm">1</span>
@@ -614,7 +594,7 @@ const SingleDoctorPrescription = () => {
                         value={doctorDetails.doctorName}
                         onChange={(e) => setDoctorDetails(prev => ({ ...prev, doctorName: e.target.value }))}
                         placeholder="Enter doctor name"
-                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     
@@ -628,7 +608,7 @@ const SingleDoctorPrescription = () => {
                         value={doctorDetails.qualification}
                         onChange={(e) => setDoctorDetails(prev => ({ ...prev, qualification: e.target.value }))}
                         placeholder="e.g., MBBS, MD"
-                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                   </div>
@@ -643,7 +623,7 @@ const SingleDoctorPrescription = () => {
                       value={doctorDetails.hospitalName}
                       onChange={(e) => setDoctorDetails(prev => ({ ...prev, hospitalName: e.target.value }))}
                       placeholder="Enter hospital/clinic name"
-                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   
@@ -657,7 +637,7 @@ const SingleDoctorPrescription = () => {
                       onChange={(e) => setDoctorDetails(prev => ({ ...prev, address: e.target.value }))}
                       placeholder="Enter clinic/hospital address"
                       rows="2"
-                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
                   
@@ -673,7 +653,7 @@ const SingleDoctorPrescription = () => {
                         onChange={(e) => setDoctorDetails(prev => ({ ...prev, phone: e.target.value }))}
                         placeholder="10-digit mobile"
                         maxLength="10"
-                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                     
@@ -687,7 +667,7 @@ const SingleDoctorPrescription = () => {
                         value={doctorDetails.registrationNo}
                         onChange={(e) => setDoctorDetails(prev => ({ ...prev, registrationNo: e.target.value }))}
                         placeholder="Medical registration number"
-                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
+                        className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500"
                       />
                     </div>
                   </div>
@@ -702,7 +682,7 @@ const SingleDoctorPrescription = () => {
                       value={doctorDetails.timing}
                       onChange={(e) => setDoctorDetails(prev => ({ ...prev, timing: e.target.value }))}
                       placeholder="e.g., 10:00 AM - 6:00 PM"
-                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500"
                     />
                   </div>
 
@@ -713,10 +693,12 @@ const SingleDoctorPrescription = () => {
                     </label>
                     <div className="flex items-center gap-3">
                       <label className="flex-1 cursor-pointer">
-                        <div className="w-full p-3 bg-white/50 backdrop-blur-sm border-2 border-dashed border-indigo-300 rounded-xl text-center hover:bg-white/70 transition-all duration-300">
+                        <div className="w-full p-3 bg-white/50 backdrop-blur-sm border-2 border-dashed border-indigo-300 rounded-xl text-center hover:bg-white/70 transition-all">
                           <FaUpload className="mx-auto text-indigo-600 mb-1" />
                           <span className="text-sm text-gray-600">
-                            {doctorDetails.logo && typeof doctorDetails.logo !== 'string' ? doctorDetails.logo.name : (doctorDetails.logo ? "Logo selected" : "Click to upload logo/stamp")}
+                            {doctorDetails.logo && typeof doctorDetails.logo !== 'string' 
+                              ? doctorDetails.logo.name 
+                              : (doctorDetails.logo ? "Logo selected" : "Click to upload logo/stamp")}
                           </span>
                           <input
                             type="file"
@@ -736,7 +718,7 @@ const SingleDoctorPrescription = () => {
                       isSavingDetails 
                         ? 'bg-gray-400 cursor-not-allowed' 
                         : 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700'
-                    } text-white font-bold rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center gap-2`}
+                    } text-white font-bold rounded-xl shadow-lg flex items-center justify-center gap-2 transition-all duration-300`}
                   >
                     {isSavingDetails ? (
                       <>
@@ -754,7 +736,7 @@ const SingleDoctorPrescription = () => {
               </div>
 
               {/* Product Configuration */}
-              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-xl border border-white/50">
                 <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center">
                   <span className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full flex items-center justify-center mr-3 shadow-md">
                     <span className="text-white font-bold text-sm">2</span>
@@ -764,14 +746,11 @@ const SingleDoctorPrescription = () => {
                 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
-                      <FaPrint className="mr-2 text-blue-600" />
-                      Prescription Type
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Prescription Type</label>
                     <select
                       value={selectedPrescription}
                       onChange={(e) => setSelectedPrescription(e.target.value)}
-                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner cursor-pointer"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl"
                     >
                       <option value="">Select Prescription Type</option>
                       {options.prescriptionTypes.map((option, index) => (
@@ -781,14 +760,11 @@ const SingleDoctorPrescription = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
-                      <FaPalette className="mr-2 text-purple-600" />
-                      Paper Type
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Paper Type</label>
                     <select
                       value={selectedPaperType}
                       onChange={(e) => setSelectedPaperType(e.target.value)}
-                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner cursor-pointer"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl"
                     >
                       <option value="">Select Paper Type</option>
                       {options.paperTypes.map((option, index) => (
@@ -798,14 +774,11 @@ const SingleDoctorPrescription = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
-                      <FaLayerGroup className="mr-2 text-green-600" />
-                      Booklet Type
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Booklet Type</label>
                     <select
                       value={selectedBookletType}
                       onChange={(e) => setSelectedBookletType(e.target.value)}
-                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner cursor-pointer"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl"
                     >
                       <option value="">Select Booklet Type</option>
                       {options.bookletTypes.map((option, index) => (
@@ -815,14 +788,11 @@ const SingleDoctorPrescription = () => {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-2 flex items-center">
-                      <FaBarcode className="mr-2 text-orange-600" />
-                      Serial Number
-                    </label>
+                    <label className="block text-sm font-semibold text-gray-700 mb-2">Serial Number</label>
                     <select
                       value={selectedSerialNumber}
                       onChange={(e) => setSelectedSerialNumber(e.target.value)}
-                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner cursor-pointer"
+                      className="w-full p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-xl"
                     >
                       <option value="">Select Serial Number Option</option>
                       {options.serialNumbers.map((option, index) => (
@@ -833,7 +803,7 @@ const SingleDoctorPrescription = () => {
 
                   <button
                     onClick={resetOptions}
-                    className="w-full py-2 backdrop-blur-sm bg-white/50 text-gray-700 font-semibold rounded-xl hover:bg-white/70 transition-all duration-300 shadow-sm"
+                    className="w-full py-2 backdrop-blur-sm bg-white/50 text-gray-700 font-semibold rounded-xl hover:bg-white/70 transition-all duration-300"
                   >
                     Reset Options
                   </button>
@@ -841,7 +811,7 @@ const SingleDoctorPrescription = () => {
               </div>
 
               {/* Price & Quantity */}
-              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50">
+              <div className="backdrop-blur-sm bg-white/40 rounded-3xl p-6 shadow-xl border border-white/50">
                 <div className="flex justify-between items-center mb-4">
                   <div>
                     <span className="text-3xl font-bold bg-gradient-to-r from-indigo-700 to-purple-700 bg-clip-text text-transparent">
@@ -852,14 +822,14 @@ const SingleDoctorPrescription = () => {
                   <div className="flex items-center space-x-3">
                     <button
                       onClick={decrementQuantity}
-                      className="w-10 h-10 backdrop-blur-sm bg-white/50 rounded-full flex items-center justify-center text-xl font-bold hover:bg-white/70 transition-all duration-300 shadow-sm"
+                      className="w-10 h-10 backdrop-blur-sm bg-white/50 rounded-full flex items-center justify-center text-xl font-bold hover:bg-white/70 transition-all duration-300"
                     >
                       -
                     </button>
                     <span className="font-bold text-xl text-gray-800">{quantity}</span>
                     <button
                       onClick={incrementQuantity}
-                      className="w-10 h-10 backdrop-blur-sm bg-white/50 rounded-full flex items-center justify-center text-xl font-bold hover:bg-white/70 transition-all duration-300 shadow-sm"
+                      className="w-10 h-10 backdrop-blur-sm bg-white/50 rounded-full flex items-center justify-center text-xl font-bold hover:bg-white/70 transition-all duration-300"
                     >
                       +
                     </button>
@@ -873,7 +843,7 @@ const SingleDoctorPrescription = () => {
                       value={pincode}
                       onChange={(e) => setPincode(e.target.value)}
                       placeholder="Enter Pincode"
-                      className="flex-1 p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-l-xl focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all duration-300 shadow-inner"
+                      className="flex-1 p-3 bg-white/50 backdrop-blur-sm border border-white/30 rounded-l-xl focus:ring-2 focus:ring-indigo-500"
                       maxLength="6"
                     />
                     <button
@@ -884,7 +854,7 @@ const SingleDoctorPrescription = () => {
                     </button>
                   </div>
                   {showDeliveryCheck && (
-                    <div className="mt-2 p-2 bg-green-500/20 backdrop-blur-sm text-green-700 rounded-lg text-sm flex items-center border border-green-500/30">
+                    <div className="mt-2 p-2 bg-green-500/20 backdrop-blur-sm text-green-700 rounded-lg text-sm flex items-center">
                       <FaCheckCircle className="mr-2" />
                       Delivery available in 5-7 days
                     </div>
@@ -898,7 +868,7 @@ const SingleDoctorPrescription = () => {
                     isAddingToCart 
                       ? 'bg-gray-400 cursor-not-allowed' 
                       : 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700'
-                  } text-white font-bold rounded-xl transition-all duration-300 shadow-lg flex items-center justify-center text-lg group`}
+                  } text-white font-bold rounded-xl shadow-lg flex items-center justify-center text-lg group transition-all duration-300`}
                 >
                   {isAddingToCart ? (
                     <>
@@ -919,7 +889,7 @@ const SingleDoctorPrescription = () => {
 
           <div className="mt-12 grid grid-cols-1 md:grid-cols-4 gap-6">
             {promiseData.map((item, index) => (
-              <div key={index} className="backdrop-blur-sm bg-white/40 rounded-2xl p-6 shadow-[12px_12px_24px_#b8b9be,_-12px_-12px_24px_#ffffff] border border-white/50 hover:shadow-[8px_8px_16px_#b8b9be,_-8px_-8px_16px_#ffffff] transition-all duration-300 transform hover:-translate-y-1">
+              <div key={index} className="backdrop-blur-sm bg-white/40 rounded-2xl p-6 shadow-xl border border-white/50 hover:shadow-lg transition-all transform hover:-translate-y-1">
                 <div className="flex items-center mb-3">
                   <div className="w-12 h-12 bg-gradient-to-br from-white/60 to-gray-100/60 rounded-full flex items-center justify-center mr-3 shadow-inner">
                     {item.icon}
@@ -939,30 +909,30 @@ const SingleDoctorPrescription = () => {
           <div className="relative max-w-5xl w-full max-h-[90vh] bg-gradient-to-br from-white to-gray-100 rounded-3xl shadow-2xl overflow-hidden animate-scaleIn">
             <div className="flex justify-between items-center p-6 border-b border-gray-200 bg-gradient-to-r from-indigo-600 to-purple-600">
               <h3 className="text-xl font-bold text-white flex items-center gap-2">
-                <FaEye className="text-white" />
+                <FaEye />
                 Prescription Pad Preview
               </h3>
               <div className="flex gap-2">
-                <button
-                  onClick={downloadPreviewImage}
-                  className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300"
-                  title="Download Preview"
+                <button 
+                  onClick={downloadPreviewImage} 
+                  className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300" 
+                  title="Download"
                 >
-                  <FaDownload className="text-lg" />
+                  <FaDownload />
                 </button>
-                <button
-                  onClick={sharePreviewImage}
-                  className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300"
-                  title="Share Preview"
+                <button 
+                  onClick={sharePreviewImage} 
+                  className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300" 
+                  title="Share"
                 >
-                  <FaShare className="text-lg" />
+                  <FaShare />
                 </button>
-                <button
-                  onClick={closePreviewModal}
-                  className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300"
+                <button 
+                  onClick={closePreviewModal} 
+                  className="p-2 text-white hover:bg-white/20 rounded-lg transition-all duration-300" 
                   title="Close"
                 >
-                  <FaTimes className="text-lg" />
+                  <FaTimes />
                 </button>
               </div>
             </div>
@@ -972,23 +942,26 @@ const SingleDoctorPrescription = () => {
                 <div className="text-center py-12">
                   <div className="text-red-500 text-4xl mb-4">⚠️</div>
                   <p className="text-gray-700">{previewError}</p>
+                  <button
+                    onClick={closePreviewModal}
+                    className="mt-4 px-6 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg"
+                  >
+                    Close
+                  </button>
                 </div>
               ) : (
                 <div className="flex justify-center items-center min-h-[400px]">
-                  <img
-                    src={previewImage}
-                    alt="Prescription Pad Preview"
-                    className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg"
-                    onError={() => setPreviewError("Failed to load preview image")}
+                  <img 
+                    src={previewImage} 
+                    alt="Prescription Pad Preview" 
+                    className="max-w-full max-h-[70vh] object-contain rounded-lg shadow-lg" 
                   />
                 </div>
               )}
             </div>
             
             <div className="p-4 border-t border-gray-200 bg-gray-50/50">
-              <p className="text-center text-sm text-gray-600">
-                This is how your prescription pad will look after printing
-              </p>
+              <p className="text-center text-sm text-gray-600">This is how your prescription pad will look after printing</p>
             </div>
           </div>
         </div>

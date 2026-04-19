@@ -207,7 +207,7 @@ const PrintShoppyNavbar = () => {
           gap: 12px;
         }
 
-        /* Modern Bottom Navigation - Clean 4 Icon Design */
+        /* Modern Bottom Navigation - 5 Icons including Logout when logged in */
         .bottom-nav {
           position: fixed;
           bottom: 0;
@@ -226,7 +226,7 @@ const PrintShoppyNavbar = () => {
           justify-content: space-around;
           align-items: center;
           width: 100%;
-          max-width: 350px;
+          max-width: ${isLoggedIn ? '450px' : '350px'};
           margin: 0 auto;
         }
 
@@ -298,29 +298,13 @@ const PrintShoppyNavbar = () => {
           bottom: -6px;
         }
         
-        /* Mobile Logout Button */
-        .mobile-logout-btn {
-          position: fixed;
-          bottom: 85px;
-          right: 20px;
-          background: linear-gradient(135deg, #ef4444, #dc2626);
-          color: white;
-          width: 52px;
-          height: 52px;
-          border-radius: 50%;
-          box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
-          z-index: 101;
-          transition: all 0.3s ease;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          cursor: pointer;
-          border: none;
+        /* Logout button in bottom nav (mobile) */
+        .logout-nav-item {
+          color: #ef4444;
         }
         
-        .mobile-logout-btn:hover {
-          transform: scale(1.05);
-          box-shadow: 0 6px 16px rgba(239, 68, 68, 0.4);
+        .logout-nav-item.active {
+          color: #dc2626;
         }
         
         /* Logo image styling */
@@ -343,9 +327,6 @@ const PrintShoppyNavbar = () => {
           .bottom-nav {
             display: none;
           }
-          .mobile-logout-btn {
-            display: none !important;
-          }
         }
         
         @media (max-width: 767px) {
@@ -353,10 +334,7 @@ const PrintShoppyNavbar = () => {
             display: none !important;
           }
           body {
-            padding-bottom: 70px;
-          }
-          .mobile-logout-btn {
-            display: ${isLoggedIn ? 'flex' : 'none'};
+            padding-bottom: 80px;
           }
         }
       `}</style>
@@ -495,7 +473,7 @@ const PrintShoppyNavbar = () => {
         </div>
       </nav>
 
-      {/* Clean Mobile Bottom Navigation - 4 Icons like Home, Wishlist, Cart, Profile */}
+      {/* Mobile Bottom Navigation - Shows Logout button next to Profile when logged in */}
       <div className="bottom-nav">
         <div className="bottom-nav-container">
           {/* Home */}
@@ -551,19 +529,22 @@ const PrintShoppyNavbar = () => {
             </div>
             <span className="nav-label">{isLoggedIn ? "Profile" : "Account"}</span>
           </button>
+
+          {/* Logout Button - Only visible when logged in */}
+          {isLoggedIn && (
+            <button
+              onClick={handleLogout}
+              className={`bottom-nav-item logout-nav-item ${activeTab === 'logout' ? 'active' : ''}`}
+            >
+              <div className="nav-icon-wrapper">
+                <FaSignOutAlt className="nav-icon" />
+                <div className="active-dot"></div>
+              </div>
+              <span className="nav-label">Logout</span>
+            </button>
+          )}
         </div>
       </div>
-
-      {/* Mobile Logout Button - Only visible when logged in */}
-      {isLoggedIn && (
-        <button
-          onClick={handleLogout}
-          className="mobile-logout-btn"
-          aria-label="Logout"
-        >
-          <FaSignOutAlt className="text-xl" />
-        </button>
-      )}
 
       {/* Spacing */}
       <div className="pt-16 md:pt-20 pb-20"></div>

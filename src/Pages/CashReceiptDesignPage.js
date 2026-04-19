@@ -17,7 +17,7 @@ const SingleCashReceipt = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   
-  // Receipt Details State (like business details in bill book)
+  // Receipt Details State
   const [receiptDetails, setReceiptDetails] = useState({
     companyName: "",
     companyAddress: "",
@@ -44,6 +44,7 @@ const SingleCashReceipt = () => {
   const [imageError, setImageError] = useState(false);
   const [isAddingToCart, setIsAddingToCart] = useState(false);
   const [isSavingDetails, setIsSavingDetails] = useState(false);
+  const [isFetchingDetails, setIsFetchingDetails] = useState(false);
   const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [previewImage, setPreviewImage] = useState(null);
@@ -90,6 +91,38 @@ const SingleCashReceipt = () => {
     return true;
   }, [navigate, getUserIdFromStorage]);
 
+  // Fetch saved receipt details from user profile
+  const fetchSavedReceiptDetails = useCallback(async () => {
+    if (!userId) return;
+    setIsFetchingDetails(true);
+    try {
+      const token = localStorage.getItem("token");
+      const response = await fetch(`${API_BASE_URL}/api/auth/receipt-details/${userId}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      const result = await response.json();
+      if (result.success && result.data) {
+        const savedDetails = result.data;
+        setReceiptDetails(prev => ({
+          ...prev,
+          companyName: savedDetails.companyName || "",
+          companyAddress: savedDetails.companyAddress || "",
+          companyEmail: savedDetails.companyEmail || "",
+          companyPhone: savedDetails.companyPhone || "",
+          receiptTitle: savedDetails.receiptTitle || "",
+          receiptNumber: savedDetails.receiptNumber || "",
+          receiptDate: savedDetails.receiptDate || "",
+          message: savedDetails.message || "",
+          logo: savedDetails.logo || null
+        }));
+      }
+    } catch (err) {
+      console.error("Error fetching saved receipt details:", err);
+    } finally {
+      setIsFetchingDetails(false);
+    }
+  }, [userId]);
+
   // Fetch receipt template details
   const fetchReceipt = useCallback(async () => {
     try {
@@ -104,22 +137,6 @@ const SingleCashReceipt = () => {
       
       if (result.success) {
         setReceipt(result.data);
-        // Pre-fill receipt details from template if available
-        if (result.data) {
-          setReceiptDetails(prev => ({
-            ...prev,
-            companyName: result.data.companyName || "",
-            companyAddress: result.data.companyAddress || "",
-            companyEmail: result.data.companyEmail || "",
-            companyPhone: result.data.companyPhone || "",
-            receiptTitle: result.data.receiptTitle || "",
-            receiptNumber: result.data.receiptNumber || "",
-            receiptDate: result.data.receiptDate ? new Date(result.data.receiptDate).toISOString().split('T')[0] : "",
-            paymentMode: result.data.paymentMode || "",
-            message: result.data.message || "",
-            logo: result.data.logo || null
-          }));
-        }
       } else {
         throw new Error("Failed to fetch receipt");
       }
@@ -131,7 +148,7 @@ const SingleCashReceipt = () => {
     }
   }, [id]);
 
-  // Save receipt details
+  // Save receipt details using the API (matching backend exactly)
   const handleSaveReceiptDetails = async () => {
     if (!userId) {
       toast.error("Please login first");
@@ -154,6 +171,8 @@ const SingleCashReceipt = () => {
     try {
       const token = localStorage.getItem("token");
       const formData = new FormData();
+      
+      // Add all fields as per backend expectations
       formData.append('companyName', receiptDetails.companyName);
       formData.append('companyAddress', receiptDetails.companyAddress);
       formData.append('companyEmail', receiptDetails.companyEmail);
@@ -161,9 +180,9 @@ const SingleCashReceipt = () => {
       formData.append('receiptTitle', receiptDetails.receiptTitle);
       formData.append('receiptNumber', receiptDetails.receiptNumber);
       formData.append('receiptDate', receiptDetails.receiptDate);
-      formData.append('paymentMode', receiptDetails.paymentMode);
       formData.append('message', receiptDetails.message);
       
+      // Add logo file if selected
       if (receiptDetails.logo && typeof receiptDetails.logo !== 'string') {
         formData.append('logo', receiptDetails.logo);
       }
@@ -182,6 +201,7 @@ const SingleCashReceipt = () => {
         toast.success("Receipt details saved successfully!");
         setShowSuccessPopup(true);
         setTimeout(() => setShowSuccessPopup(false), 3000);
+        fetchSavedReceiptDetails();
       } else {
         throw new Error(result.message || "Failed to save details");
       }
@@ -216,41 +236,29 @@ const SingleCashReceipt = () => {
       return;
     }
 
-    if (!receiptDetails.companyName || !receiptDetails.companyAddress || !receiptDetails.companyPhone) {
-      toast.error("Please save your receipt details first to see the preview");
-      return;
-    }
-
     try {
       setPreviewLoading(true);
       setPreviewError(null);
       
       const token = localStorage.getItem("token");
-      const response = await fetch(`${API_BASE_URL}/api/auth/getreceiptpreview/${userId}/${id}`, {
-        method: "POST",
+      
+      // Direct API call without any checks
+      const response = await fetch(`${API_BASE_URL}/api/auth/singlereceipt/${userId}/${id}`, {
+        method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
-        },
-        body: JSON.stringify(receiptDetails)
-      });
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        if (errorData.requiresReceiptDetails) {
-          toast.error("Please save your receipt details first!");
-          return;
         }
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
+      });
       
       const result = await response.json();
       
-      if (result.success && result.data.overlaidImage) {
+      if (result.success && result.data && result.data.overlaidImage) {
         setPreviewImage(result.data.overlaidImage);
         setShowPreviewModal(true);
       } else {
-        throw new Error(result.message || "No preview image available");
+        toast.error(result.message || "No preview image available");
+        setPreviewError(result.message || "No preview image available");
       }
     } catch (err) {
       console.error("Error fetching preview:", err);
@@ -425,6 +433,12 @@ const SingleCashReceipt = () => {
     fetchReceipt();
   }, [checkAuth, fetchReceipt]);
 
+  useEffect(() => {
+    if (userId) {
+      fetchSavedReceiptDetails();
+    }
+  }, [userId, fetchSavedReceiptDetails]);
+
   if (!userId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-orange-50 via-amber-50 to-yellow-50">
@@ -495,7 +509,7 @@ const SingleCashReceipt = () => {
             <FaCheckCircle className="text-2xl" />
             <div>
               <p className="font-bold">Success!</p>
-              <p className="text-sm">Your receipt details have been saved. You can now view the preview!</p>
+              <p className="text-sm">Your receipt details have been saved!</p>
             </div>
           </div>
         </div>
@@ -591,9 +605,6 @@ const SingleCashReceipt = () => {
                   )}
                   {receipt.design?.border && (
                     <span className="text-xs px-2 py-1 bg-purple-500/20 text-purple-700 rounded-full">Border</span>
-                  )}
-                  {receipt.logoSettings?.show && (
-                    <span className="text-xs px-2 py-1 bg-orange-500/20 text-orange-700 rounded-full">Logo Area</span>
                   )}
                 </div>
               </div>
@@ -756,7 +767,9 @@ const SingleCashReceipt = () => {
                         <div className="w-full p-3 bg-white/50 backdrop-blur-sm border-2 border-dashed border-orange-300 rounded-xl text-center hover:bg-white/70 transition-all duration-300">
                           <FaUpload className="mx-auto text-orange-600 mb-1" />
                           <span className="text-sm text-gray-600">
-                            {receiptDetails.logo && typeof receiptDetails.logo !== 'string' ? receiptDetails.logo.name : (receiptDetails.logo ? "Logo selected" : "Click to upload logo")}
+                            {receiptDetails.logo && typeof receiptDetails.logo !== 'string' 
+                              ? receiptDetails.logo.name 
+                              : (receiptDetails.logo ? "Logo selected" : "Click to upload logo")}
                           </span>
                           <input
                             type="file"
