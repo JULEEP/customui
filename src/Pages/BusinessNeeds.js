@@ -121,6 +121,10 @@ const BusinessNeedsExact = () => {
     navigate("/flex-items");
   };
 
+  const handleCapsuleClick = () => {
+    navigate("/flex");
+  };
+
   return (
     <div className="bg-gradient-to-br from-[#e0eafc] to-[#cfdef3] py-16 px-4 relative overflow-hidden">
       {/* Claymorphism Background Elements */}
@@ -175,6 +179,35 @@ const BusinessNeedsExact = () => {
               </div>
             </div>
           </div>
+        </div>
+
+        {/* ADD DESIGN Button - Right Side */}
+        <div className="flex justify-end mb-6">
+          <button
+            onClick={() => navigate("/add-design")}
+            className="group relative inline-flex items-center gap-3 px-6 py-3 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white font-bold shadow-xl hover:shadow-2xl transition-all duration-300 hover:scale-105"
+          >
+            {/* Animated background effect */}
+            <span className="absolute inset-0 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 blur-md opacity-60 group-hover:opacity-100 transition-opacity duration-300 -z-10"></span>
+            
+            {/* Plus icon */}
+            <span className="text-xl font-bold bg-white/20 rounded-full w-6 h-6 flex items-center justify-center group-hover:rotate-90 transition-transform duration-300">
+              +
+            </span>
+            
+            {/* Text */}
+            <span className="text-sm md:text-base tracking-wide">ADD DESIGN</span>
+            
+            {/* Arrow icon */}
+            <svg className="w-4 h-4 group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+            </svg>
+            
+            {/* Shine effect on hover */}
+            <div className="absolute inset-0 rounded-full overflow-hidden opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+              <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 bg-gradient-to-r from-transparent via-white/30 to-transparent"></div>
+            </div>
+          </button>
         </div>
 
         {/* Products Grid with Claymorphism */}
@@ -240,6 +273,15 @@ const BusinessNeedsExact = () => {
           transition-property: all;
           transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
           transition-duration: 300ms;
+        }
+        
+        /* Hide scrollbar but keep functionality */
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+        .no-scrollbar {
+          -ms-overflow-style: none;
+          scrollbar-width: none;
         }
       `}</style>
     </div>

@@ -33,6 +33,7 @@ import Checkout from "./Pages/Checkout";
 import MyOrders from "./Pages/MyOrders";
 import AllFlexItems from "./Pages/AllFlexItems";
 import MyProfile from "./Pages/MyProfile";
+import CanvasEditor from "./Pages/Canvaseditor";
 
 function App() {
   return (
@@ -65,6 +66,7 @@ function App() {
         <Route path="/my-orders" element={<MyOrders />} />
         <Route path="/flex-items" element={<AllFlexItems />} />
         <Route path="/my-profile" element={<MyProfile />} />
+        <Route path="/add-design" element={<CanvasEditor />} />
       </Routes>
     </Router>
   );
