@@ -34,7 +34,8 @@ import MyOrders from "./Pages/MyOrders";
 import AllFlexItems from "./Pages/AllFlexItems";
 import MyProfile from "./Pages/MyProfile";
 import CanvasEditor from "./Pages/Canvaseditor";
-
+import WeddingCardsGrid from "./Pages/WeddingCardsGrid"
+import SingleWeddingCard from "./Pages/SingleWeddingCard";
 function App() {
   return (
     <Router>
@@ -67,6 +68,8 @@ function App() {
         <Route path="/flex-items" element={<AllFlexItems />} />
         <Route path="/my-profile" element={<MyProfile />} />
         <Route path="/add-design" element={<CanvasEditor />} />
+        <Route path="/weddingcards" element={<WeddingCardsGrid />} />
+        <Route path="/wedding-cards/:id" element={<SingleWeddingCard />} />
       </Routes>
     </Router>
   );
