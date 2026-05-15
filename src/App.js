@@ -36,6 +36,11 @@ import MyProfile from "./Pages/MyProfile";
 import CanvasEditor from "./Pages/Canvaseditor";
 import WeddingCardsGrid from "./Pages/WeddingCardsGrid"
 import SingleWeddingCard from "./Pages/SingleWeddingCard";
+import FlexBooks from "./Pages/FlexBooks";
+import SingleFlexBook from "./Pages/SingleFlexBook";
+
+
+
 function App() {
   return (
     <Router>
@@ -70,6 +75,8 @@ function App() {
         <Route path="/add-design" element={<CanvasEditor />} />
         <Route path="/weddingcards" element={<WeddingCardsGrid />} />
         <Route path="/wedding-cards/:id" element={<SingleWeddingCard />} />
+        <Route path="/flexes" element={<FlexBooks />} />
+        <Route path="/flexbook/:id" element={<SingleFlexBook />} />
       </Routes>
     </Router>
   );
