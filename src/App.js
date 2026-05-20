@@ -38,6 +38,7 @@ import WeddingCardsGrid from "./Pages/WeddingCardsGrid"
 import SingleWeddingCard from "./Pages/SingleWeddingCard";
 import FlexBooks from "./Pages/FlexBooks";
 import SingleFlexBook from "./Pages/SingleFlexBook";
+import Gallery from "./Pages/Gallery"
 
 
 
@@ -77,6 +78,7 @@ function App() {
         <Route path="/wedding-cards/:id" element={<SingleWeddingCard />} />
         <Route path="/flexes" element={<FlexBooks />} />
         <Route path="/flexbook/:id" element={<SingleFlexBook />} />
+        <Route path="/gallery" element={<Gallery />} />
       </Routes>
     </Router>
   );

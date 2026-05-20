@@ -3301,79 +3301,284 @@ export default function CanvasEditor() {
     }
   };
 
-  const saveAndGoBack = () => {
-    const designData = { elements, bgColor, bgImage, bgOpacity, canvasSize, designTitle, productType };
-    localStorage.setItem('savedDesign', JSON.stringify(designData));
-    toast.success("Design saved!");
-    navigate(-1);
-  };
 
-  const exportPNG = async () => {
-    const canvas = document.createElement("canvas");
-    canvas.width = canvasSize.w;
-    canvas.height = canvasSize.h;
-    const ctx = canvas.getContext("2d");
-    ctx.fillStyle = bgColor;
-    ctx.fillRect(0, 0, canvasSize.w, canvasSize.h);
-    
-    const loadImg = src => new Promise(res => {
-      const i = new Image();
-      i.crossOrigin = "anonymous";
-      i.onload = () => res(i);
-      i.onerror = () => res(null);
-      i.src = src;
-    });
-    
-    if (bgImage) {
-      const img = await loadImg(bgImage);
-      if (img) {
-        ctx.save();
-        ctx.globalAlpha = bgOpacity / 100;
-        ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)${filterPreset ? " " + filterPreset : ""}`;
-        ctx.drawImage(img, 0, 0, canvasSize.w, canvasSize.h);
-        ctx.restore();
-      }
-    }
-    
-    for (const el of elements) {
+// Modified exportPNG function - Can both download AND return data URL for saving
+const exportPNG = async (returnAsDataURL = false) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasSize.w;
+  canvas.height = canvasSize.h;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, canvasSize.w, canvasSize.h);
+  
+  const loadImg = src => new Promise(res => {
+    const i = new Image();
+    i.crossOrigin = "anonymous";
+    i.onload = () => res(i);
+    i.onerror = () => res(null);
+    i.src = src;
+  });
+  
+  if (bgImage) {
+    const img = await loadImg(bgImage);
+    if (img) {
       ctx.save();
-      ctx.globalAlpha = (el.opacity ?? 100) / 100;
-      const cx = el.x + (el.w || el.size || 80) / 2;
-      const cy = el.y + (el.h || el.size || 80) / 2;
-      if (el.rotation) {
-        ctx.translate(cx, cy);
-        ctx.rotate(el.rotation * Math.PI / 180);
-        ctx.translate(-cx, -cy);
-      }
-      if (el.type === "image") {
-        const img = await loadImg(el.src);
-        if (img) ctx.drawImage(img, el.x, el.y, el.w, el.h);
-      } else if (el.type === "text") {
-        ctx.font = `${el.italic ? "italic " : ""}${el.bold ? "bold " : ""}${el.fontSize}px ${el.fontFamily}`;
-        ctx.fillStyle = el.color;
-        ctx.textAlign = el.align || "left";
-        let tx = el.x;
-        if (el.align === "center") tx = el.x + el.w / 2;
-        if (el.align === "right") tx = el.x + el.w;
-        ctx.fillText(el.text, tx, el.y + el.fontSize);
-      } else if (el.type === "shape") {
-        ctx.fillStyle = el.fill === "transparent" ? "rgba(0,0,0,0)" : el.fill;
-        ctx.strokeStyle = el.stroke;
-        ctx.lineWidth = el.strokeW;
-        ctx.beginPath();
-        if (el.shape === "rect") ctx.rect(el.x, el.y, el.w, el.h);
-        else if (el.shape === "circle") ctx.ellipse(el.x + el.w/2, el.y + el.h/2, el.w/2, el.h/2, 0, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.stroke();
-      }
+      ctx.globalAlpha = bgOpacity / 100;
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)${filterPreset ? " " + filterPreset : ""}`;
+      ctx.drawImage(img, 0, 0, canvasSize.w, canvasSize.h);
       ctx.restore();
     }
-    
+  }
+  
+  for (const el of elements) {
+    ctx.save();
+    ctx.globalAlpha = (el.opacity ?? 100) / 100;
+    const cx = el.x + (el.w || el.size || 80) / 2;
+    const cy = el.y + (el.h || el.size || 80) / 2;
+    if (el.rotation) {
+      ctx.translate(cx, cy);
+      ctx.rotate(el.rotation * Math.PI / 180);
+      ctx.translate(-cx, -cy);
+    }
+    if (el.type === "image") {
+      const img = await loadImg(el.src);
+      if (img) ctx.drawImage(img, el.x, el.y, el.w, el.h);
+    } else if (el.type === "text") {
+      ctx.font = `${el.italic ? "italic " : ""}${el.bold ? "bold " : ""}${el.fontSize}px ${el.fontFamily}`;
+      ctx.fillStyle = el.color;
+      ctx.textAlign = el.align || "left";
+      let tx = el.x;
+      if (el.align === "center") tx = el.x + el.w / 2;
+      if (el.align === "right") tx = el.x + el.w;
+      ctx.fillText(el.text, tx, el.y + el.fontSize);
+    } else if (el.type === "shape") {
+      ctx.fillStyle = el.fill === "transparent" ? "rgba(0,0,0,0)" : el.fill;
+      ctx.strokeStyle = el.stroke;
+      ctx.lineWidth = el.strokeW;
+      ctx.beginPath();
+      if (el.shape === "rect") ctx.rect(el.x, el.y, el.w, el.h);
+      else if (el.shape === "circle") ctx.ellipse(el.x + el.w/2, el.y + el.h/2, el.w/2, el.h/2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  
+  const dataURL = canvas.toDataURL();
+  
+  if (returnAsDataURL) {
+    // Return data URL for saving to server
+    return dataURL;
+  } else {
+    // Download as file (original behavior)
     const a = document.createElement("a");
     a.download = `${designTitle}.png`;
-    a.href = canvas.toDataURL();
+    a.href = dataURL;
     a.click();
-  };
+  }
+};
+
+// Helper: Get current user ID
+const getCurrentUserId = () => {
+  try {
+    const userStr = localStorage.getItem("user");
+    if (userStr) {
+      const user = JSON.parse(userStr);
+      return user._id || user.id;
+    }
+  } catch (e) {}
+  return null;
+};
+
+// Helper: Canvas se PNG file banao (base64 nahi)
+const canvasToFile = async () => {
+  const canvas = document.createElement("canvas");
+  canvas.width = canvasSize.w;
+  canvas.height = canvasSize.h;
+  const ctx = canvas.getContext("2d");
+  
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, canvasSize.w, canvasSize.h);
+  
+  const loadImg = src => new Promise(res => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => res(img);
+    img.onerror = () => res(null);
+    img.src = src;
+  });
+  
+  if (bgImage) {
+    const img = await loadImg(bgImage);
+    if (img) {
+      ctx.save();
+      ctx.globalAlpha = bgOpacity / 100;
+      ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)${filterPreset ? " " + filterPreset : ""}`;
+      ctx.drawImage(img, 0, 0, canvasSize.w, canvasSize.h);
+      ctx.restore();
+    }
+  }
+  
+  for (const el of elements) {
+    ctx.save();
+    ctx.globalAlpha = (el.opacity ?? 100) / 100;
+    const cx = el.x + (el.w || el.size || 80) / 2;
+    const cy = el.y + (el.h || el.size || 80) / 2;
+    if (el.rotation) {
+      ctx.translate(cx, cy);
+      ctx.rotate(el.rotation * Math.PI / 180);
+      ctx.translate(-cx, -cy);
+    }
+    if (el.type === "image") {
+      const img = await loadImg(el.src);
+      if (img) ctx.drawImage(img, el.x, el.y, el.w, el.h);
+    } else if (el.type === "text") {
+      ctx.font = `${el.italic ? "italic " : ""}${el.bold ? "bold " : ""}${el.fontSize}px ${el.fontFamily}`;
+      ctx.fillStyle = el.color;
+      ctx.textAlign = el.align || "left";
+      let tx = el.x;
+      if (el.align === "center") tx = el.x + el.w / 2;
+      if (el.align === "right") tx = el.x + el.w;
+      ctx.fillText(el.text, tx, el.y + el.fontSize);
+    } else if (el.type === "shape") {
+      ctx.fillStyle = el.fill === "transparent" ? "rgba(0,0,0,0)" : el.fill;
+      ctx.strokeStyle = el.stroke;
+      ctx.lineWidth = el.strokeW;
+      ctx.beginPath();
+      if (el.shape === "rect") ctx.rect(el.x, el.y, el.w, el.h);
+      else if (el.shape === "circle") ctx.ellipse(el.x + el.w/2, el.y + el.h/2, el.w/2, el.h/2, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  
+  // 🔥 File banao, base64 string nahi
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => {
+      const file = new File([blob], `design-${Date.now()}.png`, { type: 'image/png' });
+      resolve(file);
+    }, 'image/png');
+  });
+};
+
+// CanvasEditor.jsx - Save function
+
+const saveDesignToServer = async () => {
+  const toastId = toast.loading("Saving design...");
+  
+  try {
+    // Step 1: Canvas se file banao
+    const file = await canvasToFile();
+    
+    // Step 2: User ID lo
+    const userId = getCurrentUserId();
+    if (!userId) {
+      toast.error("Please login first", { id: toastId });
+      return;
+    }
+    
+    // 🔥 Step 3: FlexBookId lo (jo API se aaya tha)
+    const flexBookId = location.state?.flexBookData?.flexBookId || 
+                       localStorage.getItem('currentFlexBookId') ||
+                       null;
+    
+    // Step 4: FormData banao
+    const formData = new FormData();
+    formData.append('image', file);           // File
+    formData.append('flexBookId', flexBookId); // 🔥 FlexBookId bhi bhejo
+    
+    // Step 5: Request bhejo
+    const response = await fetch(`https://designback.onrender.com/api/auth/save/${userId}`, {
+      method: 'POST',
+      body: formData,  // FormData mein file + flexBookId dono
+    });
+    
+    const result = await response.json();
+    
+    if (result.success) {
+      toast.success("Design saved!", { id: toastId });
+      setTimeout(() => navigate(-1), 1000);
+    } else {
+      toast.error(result.message, { id: toastId });
+    }
+  } catch (error) {
+    console.error("Save error:", error);
+    toast.error(error.message || "Error saving design", { id: toastId });
+  }
+};
+
+// Save button handler
+const saveAndGoBack = () => {
+  saveDesignToServer();
+};
+
+  // const exportPNG = async () => {
+  //   const canvas = document.createElement("canvas");
+  //   canvas.width = canvasSize.w;
+  //   canvas.height = canvasSize.h;
+  //   const ctx = canvas.getContext("2d");
+  //   ctx.fillStyle = bgColor;
+  //   ctx.fillRect(0, 0, canvasSize.w, canvasSize.h);
+    
+  //   const loadImg = src => new Promise(res => {
+  //     const i = new Image();
+  //     i.crossOrigin = "anonymous";
+  //     i.onload = () => res(i);
+  //     i.onerror = () => res(null);
+  //     i.src = src;
+  //   });
+    
+  //   if (bgImage) {
+  //     const img = await loadImg(bgImage);
+  //     if (img) {
+  //       ctx.save();
+  //       ctx.globalAlpha = bgOpacity / 100;
+  //       ctx.filter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)${filterPreset ? " " + filterPreset : ""}`;
+  //       ctx.drawImage(img, 0, 0, canvasSize.w, canvasSize.h);
+  //       ctx.restore();
+  //     }
+  //   }
+    
+  //   for (const el of elements) {
+  //     ctx.save();
+  //     ctx.globalAlpha = (el.opacity ?? 100) / 100;
+  //     const cx = el.x + (el.w || el.size || 80) / 2;
+  //     const cy = el.y + (el.h || el.size || 80) / 2;
+  //     if (el.rotation) {
+  //       ctx.translate(cx, cy);
+  //       ctx.rotate(el.rotation * Math.PI / 180);
+  //       ctx.translate(-cx, -cy);
+  //     }
+  //     if (el.type === "image") {
+  //       const img = await loadImg(el.src);
+  //       if (img) ctx.drawImage(img, el.x, el.y, el.w, el.h);
+  //     } else if (el.type === "text") {
+  //       ctx.font = `${el.italic ? "italic " : ""}${el.bold ? "bold " : ""}${el.fontSize}px ${el.fontFamily}`;
+  //       ctx.fillStyle = el.color;
+  //       ctx.textAlign = el.align || "left";
+  //       let tx = el.x;
+  //       if (el.align === "center") tx = el.x + el.w / 2;
+  //       if (el.align === "right") tx = el.x + el.w;
+  //       ctx.fillText(el.text, tx, el.y + el.fontSize);
+  //     } else if (el.type === "shape") {
+  //       ctx.fillStyle = el.fill === "transparent" ? "rgba(0,0,0,0)" : el.fill;
+  //       ctx.strokeStyle = el.stroke;
+  //       ctx.lineWidth = el.strokeW;
+  //       ctx.beginPath();
+  //       if (el.shape === "rect") ctx.rect(el.x, el.y, el.w, el.h);
+  //       else if (el.shape === "circle") ctx.ellipse(el.x + el.w/2, el.y + el.h/2, el.w/2, el.h/2, 0, 0, Math.PI * 2);
+  //       ctx.fill();
+  //       ctx.stroke();
+  //     }
+  //     ctx.restore();
+  //   }
+    
+  //   const a = document.createElement("a");
+  //   a.download = `${designTitle}.png`;
+  //   a.href = canvas.toDataURL();
+  //   a.click();
+  // };
 
   const bgFilter = `brightness(${brightness}%) contrast(${contrast}%) saturate(${saturation}%)${filterPreset ? " " + filterPreset : ""}`;
 

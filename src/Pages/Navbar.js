@@ -4,7 +4,7 @@ import {
   FaHeart, FaShoppingCart, FaUser, FaSignInAlt, FaUserPlus,
   FaTrophy, FaUsers, FaCamera, FaGem, FaTruck, FaStarHalfAlt,
   FaPalette, FaHome, FaSignOutAlt, FaUserCircle, FaStore,
-  FaClipboardList, FaGift, FaHistory
+  FaClipboardList, FaGift, FaHistory, FaImages
 } from "react-icons/fa";
 
 const PrintShoppyNavbar = () => {
@@ -102,6 +102,11 @@ const PrintShoppyNavbar = () => {
   const handleOrdersClick = () => {
     setActiveTab("orders");
     navigate("/orders");
+  };
+  // 🔥 NEW: Gallery click handler
+  const handleGalleryClick = () => {
+    setActiveTab("gallery");
+    navigate("/gallery");
   };
   const handleLogout = () => logout();
 
@@ -207,7 +212,7 @@ const PrintShoppyNavbar = () => {
           gap: 12px;
         }
 
-        /* Modern Bottom Navigation - 5 Icons including Logout when logged in */
+        /* Modern Bottom Navigation */
         .bottom-nav {
           position: fixed;
           bottom: 0;
@@ -226,7 +231,7 @@ const PrintShoppyNavbar = () => {
           justify-content: space-around;
           align-items: center;
           width: 100%;
-          max-width: ${isLoggedIn ? '450px' : '350px'};
+          max-width: ${isLoggedIn ? '550px' : '450px'};
           margin: 0 auto;
         }
 
@@ -307,6 +312,15 @@ const PrintShoppyNavbar = () => {
           color: #dc2626;
         }
         
+        /* Gallery button in bottom nav */
+        .gallery-nav-item {
+          color: #10b981;
+        }
+        
+        .gallery-nav-item.active {
+          color: #059669;
+        }
+        
         /* Logo image styling */
         .custom-logo {
           width: 50px;
@@ -382,6 +396,15 @@ const PrintShoppyNavbar = () => {
 
               {/* Desktop Icons - Hidden on Mobile */}
               <div className="desktop-icons">
+                {/* 🔥 NEW: Gallery Button for Desktop */}
+                <button
+                  onClick={handleGalleryClick}
+                  className="icon-btn p-2 md:p-3 rounded-full transition-all"
+                  title="My Gallery"
+                >
+                  <FaImages className="text-green-500 text-lg md:text-xl" />
+                </button>
+
                 <div className="relative">
                   <button
                     onClick={handleWishlistClick}
@@ -473,7 +496,7 @@ const PrintShoppyNavbar = () => {
         </div>
       </nav>
 
-      {/* Mobile Bottom Navigation - Shows Logout button next to Profile when logged in */}
+      {/* Mobile Bottom Navigation - With Gallery Button */}
       <div className="bottom-nav">
         <div className="bottom-nav-container">
           {/* Home */}
@@ -486,6 +509,18 @@ const PrintShoppyNavbar = () => {
               <div className="active-dot"></div>
             </div>
             <span className="nav-label">Home</span>
+          </button>
+
+          {/* 🔥 NEW: Gallery Button for Mobile */}
+          <button 
+            onClick={handleGalleryClick} 
+            className={`bottom-nav-item gallery-nav-item ${activeTab === 'gallery' ? 'active' : ''}`}
+          >
+            <div className="nav-icon-wrapper">
+              <FaImages className="nav-icon" />
+              <div className="active-dot"></div>
+            </div>
+            <span className="nav-label">Gallery</span>
           </button>
 
           {/* Wishlist with Badge */}
