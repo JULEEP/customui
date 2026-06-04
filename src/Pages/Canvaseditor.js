@@ -4623,7 +4623,7 @@
 
 
 
-// CanvasEditor.jsx - Complete with Fixed Gradient Text + No Canvas Tools
+// CanvasEditor.jsx - Complete with Working Crop Feature + Image Adjustments + Perfect Circle Shape + Enhanced Text Shadow with Color + Full Color Picker
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast, Toaster } from 'react-hot-toast';
@@ -4636,10 +4636,12 @@ import {
   FiPlay, FiEye, FiScissors, FiCrop,
   FiEdit2, FiXCircle, FiLock, FiUnlock, FiLink, FiMove, FiRotateCw,
   FiBox, FiAlignJustify, FiGlobe, FiScissors as FiRemoveBg,
-  FiHeart, FiStar, FiSun, FiMoon, FiRefreshCw, FiMaximize2, FiMinimize2
+  FiHeart, FiStar, FiSun, FiMoon, FiRefreshCw, FiMaximize2, FiMinimize2,
+  FiMaximize, FiMinimize, FiCircle as FiCircleIcon, FiCheckCircle
 } from 'react-icons/fi';
 import { MdAnimation, MdOpacity, MdColorLens, MdFormatLineSpacing, MdTextFields, 
-  MdBlurOn, MdBorderAll, MdTransform, MdGradient } from 'react-icons/md';
+  MdBlurOn, MdBorderAll, MdTransform, MdPhotoSizeSelectLarge, 
+  MdPhotoSizeSelectSmall, MdAspectRatio } from 'react-icons/md';
 
 const FONTS = ["Arial","Georgia","Impact","Courier New","Verdana","Times New Roman","Comic Sans MS","Trebuchet MS","Tahoma","Palatino","Poppins","Roboto","Open Sans"];
 const FILTERS_LIST = [
@@ -4732,6 +4734,24 @@ export default function CanvasEditor() {
   const [bgGradient, setBgGradient] = useState(null);
   const [tempGradientColors, setTempGradientColors] = useState(["#FF6B6B", "#4ECDC4"]);
   const [tempGradientType, setTempGradientType] = useState("linear");
+  const [showGradientOption, setShowGradientOption] = useState(false);
+  
+  // Crop related state
+  const [isCropping, setIsCropping] = useState(false);
+  const [cropElementId, setCropElementId] = useState(null);
+  const [cropStart, setCropStart] = useState(null);
+  const [cropSelection, setCropSelection] = useState(null);
+  const [originalImageElement, setOriginalImageElement] = useState(null);
+
+  // Image adjustment state
+  const [imageSizeAdjust, setImageSizeAdjust] = useState(100);
+  const [imageShapeAdjust, setImageShapeAdjust] = useState("original");
+
+  // Text shadow state
+  const [textShadowBlur, setTextShadowBlur] = useState(4);
+  const [textShadowColor, setTextShadowColor] = useState("#000000");
+  const [textShadowX, setTextShadowX] = useState(2);
+  const [textShadowY, setTextShadowY] = useState(2);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth < 768);
@@ -4758,7 +4778,7 @@ export default function CanvasEditor() {
   const [contrast, setContrast] = useState(100);
   const [saturation, setSaturation] = useState(100);
   const [canvasSize, setCanvasSize] = useState({ w: 800, h: 800 });
-  const [zoom, setZoom] = useState(0.55);
+  const [canvasZoom, setCanvasZoom] = useState(0.55);
   const [showGrid, setShowGrid] = useState(false);
   const [showGuides, setShowGuides] = useState(false);
   const [showBleed, setShowBleed] = useState(false);
@@ -4796,13 +4816,227 @@ export default function CanvasEditor() {
   const uploadBgRef = useRef(null);
   const uploadImgRef = useRef(null);
 
-  useEffect(() => {
-    if (isMobile) {
-      const vw = window.innerWidth;
-      const newZoom = Math.min(0.5, (vw - 30) / canvasSize.w);
-      setZoom(Math.max(0.3, +newZoom.toFixed(2)));
+  // Start crop
+  const startCrop = (elementId, element) => {
+    if (!element || element.type !== "image") {
+      toast.error("Please select an image to crop");
+      return;
     }
-  }, [isMobile, canvasSize]);
+    
+    setCropElementId(elementId);
+    setOriginalImageElement(element);
+    setCropSelection(null);
+    setCropStart(null);
+    setIsCropping(true);
+    setActiveFeature(null);
+  };
+
+  const handleCropMouseDown = (e) => {
+    if (!isCropping) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = canvasAreaRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    
+    const canvasX = (clientX - rect.left) / canvasZoom;
+    const canvasY = (clientY - rect.top) / canvasZoom;
+    
+    const element = elements.find(el => el.id === cropElementId);
+    if (!element) return;
+    
+    if (canvasX >= element.x && canvasX <= element.x + element.w &&
+        canvasY >= element.y && canvasY <= element.y + element.h) {
+      setCropStart({ x: canvasX, y: canvasY });
+      setCropSelection({ x: canvasX, y: canvasY, w: 0, h: 0 });
+    }
+  };
+
+  const handleCropMouseMove = (e) => {
+    if (!isCropping || !cropStart) return;
+    e.preventDefault();
+    e.stopPropagation();
+    
+    const rect = canvasAreaRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    
+    const element = elements.find(el => el.id === cropElementId);
+    if (!element) return;
+    
+    const clientX = e.clientX;
+    const clientY = e.clientY;
+    
+    const currentX = (clientX - rect.left) / canvasZoom;
+    const currentY = (clientY - rect.top) / canvasZoom;
+    
+    let x = Math.min(cropStart.x, currentX);
+    let y = Math.min(cropStart.y, currentY);
+    let w = Math.abs(currentX - cropStart.x);
+    let h = Math.abs(currentY - cropStart.y);
+    
+    x = Math.max(element.x, Math.min(x, element.x + element.w));
+    y = Math.max(element.y, Math.min(y, element.y + element.h));
+    w = Math.min(w, element.x + element.w - x);
+    h = Math.min(h, element.y + element.h - y);
+    
+    setCropSelection({ x, y, w, h });
+  };
+
+  const handleCropMouseUp = () => {
+    if (!isCropping || !cropStart) {
+      setCropStart(null);
+      return;
+    }
+    
+    if (cropSelection && cropSelection.w > 5 && cropSelection.h > 5) {
+      applyCrop();
+    } else {
+      cancelCrop();
+      toast.error("Please drag to select an area to crop");
+    }
+  };
+
+  const applyCrop = () => {
+    if (!cropElementId || !cropSelection || !originalImageElement) {
+      toast.error("Cannot apply crop");
+      cancelCrop();
+      return;
+    }
+    
+    const element = originalImageElement;
+    const selection = cropSelection;
+    
+    if (selection.w < 5 || selection.h < 5) {
+      toast.error("Please select a valid crop area");
+      return;
+    }
+    
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      
+      const scaleX = img.width / element.w;
+      const scaleY = img.height / element.h;
+      
+      const srcX = (selection.x - element.x) * scaleX;
+      const srcY = (selection.y - element.y) * scaleY;
+      const srcW = selection.w * scaleX;
+      const srcH = selection.h * scaleY;
+      
+      const actualSrcX = Math.max(0, Math.min(srcX, img.width));
+      const actualSrcY = Math.max(0, Math.min(srcY, img.height));
+      const actualSrcW = Math.min(srcW, img.width - actualSrcX);
+      const actualSrcH = Math.min(srcH, img.height - actualSrcY);
+      
+      if (actualSrcW <= 0 || actualSrcH <= 0) {
+        toast.error("Invalid crop area");
+        cancelCrop();
+        return;
+      }
+      
+      canvas.width = actualSrcW;
+      canvas.height = actualSrcH;
+      
+      ctx.drawImage(img, actualSrcX, actualSrcY, actualSrcW, actualSrcH, 0, 0, actualSrcW, actualSrcH);
+      
+      const croppedImageUrl = canvas.toDataURL('image/png');
+      
+      setElements(prev => prev.map(el => {
+        if (el.id === cropElementId) {
+          return {
+            ...el,
+            src: croppedImageUrl,
+            w: selection.w,
+            h: selection.h,
+            x: selection.x,
+            y: selection.y
+          };
+        }
+        return el;
+      }));
+      
+      toast.success("Image cropped successfully!");
+      cancelCrop();
+      
+      setTimeout(() => {
+        setElements(prev => {
+          pushHistory(prev);
+          return prev;
+        });
+      }, 100);
+    };
+    
+    img.onerror = () => {
+      toast.error("Failed to load image for cropping");
+      cancelCrop();
+    };
+    
+    img.src = element.src;
+  };
+
+  const cancelCrop = () => {
+    setIsCropping(false);
+    setCropElementId(null);
+    setCropSelection(null);
+    setCropStart(null);
+    setOriginalImageElement(null);
+  };
+
+  // Adjust image size (enlarge/shrink)
+  const adjustImageSize = (value) => {
+    if (!selEl || selEl.type !== "image") return;
+    const newSize = Math.max(20, Math.min(300, value));
+    setImageSizeAdjust(newSize);
+    const aspectRatio = selEl.w / selEl.h;
+    commitSel({ 
+      w: newSize, 
+      h: newSize / aspectRatio 
+    });
+  };
+
+  // Adjust image shape/aspect ratio
+  const adjustImageShape = (shape) => {
+    if (!selEl || selEl.type !== "image") return;
+    setImageShapeAdjust(shape);
+    
+    let newW = selEl.w;
+    let newH = selEl.h;
+    
+    switch(shape) {
+      case "square":
+        newW = Math.min(selEl.w, selEl.h);
+        newH = newW;
+        break;
+      case "portrait":
+        newW = selEl.w;
+        newH = selEl.w * 1.414;
+        break;
+      case "landscape":
+        newW = selEl.h * 1.414;
+        newH = selEl.h;
+        break;
+      case "circle":
+        commitSel({ borderRadius: 999 });
+        return;
+      case "original":
+        const originalImg = new Image();
+        originalImg.src = selEl.src;
+        originalImg.onload = () => {
+          const aspect = originalImg.width / originalImg.height;
+          commitSel({ w: selEl.w, h: selEl.w / aspect });
+        };
+        return;
+      default:
+        return;
+    }
+    
+    commitSel({ w: newW, h: newH });
+  };
 
   const pushHistory = useCallback((els) => {
     setHistory(h => {
@@ -4877,7 +5111,7 @@ export default function CanvasEditor() {
         gradientType: "linear",
         bold: style?.fontWeight === "bold", italic: style?.italic || false,
         underline: style?.underline || false, align,
-        opacity: 100, rotation: 0, animation: "none", scale: 1, skewX: 0, skewY: 0,
+        opacity: 100, rotation: 0, animation: "none", scale: 1,
         lineHeight: 1.3, letterSpacing: 0, textBackground: "transparent", textShadow: "none",
         textOutline: "none", outlineWidth: 0, outlineColor: "#000000",
         shadow: { enabled: false, color: "#000", blur: 4, x: 2, y: 2 },
@@ -4910,7 +5144,7 @@ export default function CanvasEditor() {
           gradientColors: ["#FF6B6B", "#4ECDC4"],
           gradientType: "linear",
           bold: false, italic: false, underline: false, align: "left",
-          opacity: 100, rotation: 0, animation: "none", scale: 1, skewX: 0, skewY: 0,
+          opacity: 100, rotation: 0, animation: "none", scale: 1,
           lineHeight: 1.3, letterSpacing: 0, textBackground: "transparent", textShadow: "none",
           textOutline: "none", outlineWidth: 0, outlineColor: "#000000",
           shadow: { enabled: false, color: "#000", blur: 4, x: 2, y: 2 },
@@ -5128,7 +5362,7 @@ export default function CanvasEditor() {
     const rect = canvasAreaRef.current.getBoundingClientRect();
     const clientX = e.touches ? e.touches[0].clientX : e.clientX;
     const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    return { x: (clientX - rect.left) / zoom, y: (clientY - rect.top) / zoom };
+    return { x: (clientX - rect.left) / canvasZoom, y: (clientY - rect.top) / canvasZoom };
   };
 
   const getCenter = (el) => ({ x: el.x + (el.w || el.size || 80) / 2, y: el.y + (el.h || el.size || 80) / 2 });
@@ -5156,7 +5390,7 @@ export default function CanvasEditor() {
   };
 
   const hitHandle = (x, y, el) => {
-    const hs = HANDLE_R * 2 / zoom;
+    const hs = HANDLE_R * 2 / canvasZoom;
     for (const h of HANDLES) {
       const p = getHPos(el, h);
       if (Math.abs(x - p.x) <= hs && Math.abs(y - p.y) <= hs) return h;
@@ -5167,7 +5401,7 @@ export default function CanvasEditor() {
   const hitRotateHandle = (x, y, el) => {
     const center = getCenter(el);
     const handlePos = { x: center.x, y: el.y - 25 };
-    const hs = 15 / zoom;
+    const hs = 15 / canvasZoom;
     return Math.abs(x - handlePos.x) <= hs && Math.abs(y - handlePos.y) <= hs;
   };
 
@@ -5209,6 +5443,8 @@ export default function CanvasEditor() {
   };
 
   const onPointerDown = (e) => {
+    if (isCropping) return;
+    
     e.preventDefault();
     const { x, y } = getXY(e);
     
@@ -5232,9 +5468,16 @@ export default function CanvasEditor() {
       const now = Date.now();
       const isDoubleClick = (now - lastClickRef.current.time) < 300 && lastClickRef.current.id === hit.id;
       lastClickRef.current = { id: hit.id, time: now };
+      
       setSelId(hit.id);
-      if (isDoubleClick && hit.type === "text" && !isLocked) startInlineEdit(hit.id, hit.text);
-      if (!isLocked && !isDoubleClick) interactRef.current = { type: "move", id: hit.id, startX: x, startY: y, origEl: { ...hit } };
+      
+      if (isDoubleClick && hit.type === "text" && !isLocked) {
+        startInlineEdit(hit.id, hit.text);
+      }
+      
+      if (!isLocked && !isDoubleClick) {
+        interactRef.current = { type: "move", id: hit.id, startX: x, startY: y, origEl: { ...hit } };
+      }
     } else {
       if (!editingTextId) { setSelId(null); setActiveFeature(null); setPanel(null); }
       interactRef.current = { type: null };
@@ -5242,7 +5485,7 @@ export default function CanvasEditor() {
   };
 
   const onPointerMove = (e) => {
-    if (isLocked) return;
+    if (isLocked || isCropping) return;
     const { x, y } = getXY(e);
     if (isRotating && selEl) {
       const center = getCenter(selEl);
@@ -5332,9 +5575,9 @@ export default function CanvasEditor() {
       id: uid(), type: "text", text: tText, x: 100, y: 100,
       w: dimensions.width + 30, h: tSize * 1.6,
       fontSize: tSize, fontFamily: tFont, color: tColor,
-      useGradient: tUseGradient, gradientColors: tGradientColors, gradientType: tGradientType,
+      useGradient: false, gradientColors: tGradientColors, gradientType: tGradientType,
       bold: tBold, italic: tItalic, underline: tUnderline, align: tAlign,
-      opacity: 100, rotation: 0, animation: "none", scale: 1, skewX: 0, skewY: 0,
+      opacity: 100, rotation: 0, animation: "none", scale: 1,
       lineHeight: 1.3, letterSpacing: 0, textBackground: "transparent", textShadow: "none",
       textOutline: "none", outlineWidth: 0, outlineColor: "#000000",
       shadow: { enabled: false, color: "#000", blur: 4, x: 2, y: 2 }
@@ -5344,17 +5587,33 @@ export default function CanvasEditor() {
     setActiveFeature(null);
   };
 
+  // Circle shape - perfect gol round shape with equal width and height
   const addShape = (shape) => {
     if (shape === "image-rect" || shape === "image-circle") {
       setSelectedShapeForImage(shape === "image-rect" ? "rect" : "circle");
       setShowImageUploader(true);
       return;
     }
+    
+    let shapeWidth = 140;
+    let shapeHeight = 140;
+    let shapeBorderRadius = 0;
+    
+    if (shape === "circle") {
+      shapeHeight = shapeWidth;
+      shapeBorderRadius = 999;
+    }
+    
     const el = { 
-      id: uid(), type: "shape", shape, x: 200, y: 200, w: 140, h: 140, 
-      fill: sFill, stroke: sStroke, strokeW: sStrokeW, opacity: 100, rotation: 0, borderRadius: 0,
+      id: uid(), type: "shape", shape, 
+      x: 200, y: 200, 
+      w: shapeWidth, h: shapeHeight, 
+      fill: sFill, stroke: sStroke, strokeW: sStrokeW, 
+      opacity: 100, rotation: 0, 
+      borderRadius: shapeBorderRadius,
       imageSrc: null, imageScale: 1, imagePosition: { x: 0, y: 0 },
-      shadow: { enabled: false, color: "#000", blur: 4, x: 2, y: 2 }, blur: 0
+      shadow: { enabled: false, color: "#000", blur: 4, x: 2, y: 2 }, 
+      blur: 0
     };
     commitElements([...elements, el]);
     setSelId(el.id);
@@ -5428,23 +5687,7 @@ export default function CanvasEditor() {
         let tx=el.x; if(el.align==="center") tx=el.x+el.w/2; if(el.align==="right") tx=el.x+el.w;
         const textY = el.y + el.fontSize;
         
-        if (el.useGradient && el.gradientColors && el.gradientColors.length >= 2) {
-          const gradient = el.gradientType === "linear"
-            ? ctx.createLinearGradient(tx, textY - el.fontSize, tx + (el.w || 100), textY + el.fontSize/2)
-            : ctx.createRadialGradient(tx + (el.w || 100)/2, textY - el.fontSize/2, 5, tx + (el.w || 100)/2, textY - el.fontSize/2, Math.max(el.w || 100, el.fontSize));
-          el.gradientColors.forEach((color, idx) => {
-            gradient.addColorStop(idx / (el.gradientColors.length - 1), color);
-          });
-          ctx.fillStyle = gradient;
-        } else {
-          ctx.fillStyle = el.color;
-        }
-        
-        if (el.textOutline === "solid" && el.outlineWidth > 0) {
-          ctx.lineWidth = el.outlineWidth;
-          ctx.strokeStyle = el.outlineColor;
-          ctx.strokeText(el.text, tx, textY);
-        }
+        ctx.fillStyle = el.color;
         ctx.fillText(el.text, tx, textY);
       } else if (el.type==="shape" && el.imageSrc) {
         const img = await loadImg(el.imageSrc);
@@ -5463,24 +5706,24 @@ export default function CanvasEditor() {
           ctx.restore();
         }
       } else if (el.type==="shape"){
-        if (el.borderRadius) {
-          ctx.beginPath();
-          ctx.roundRect(el.x, el.y, el.w, el.h, el.borderRadius);
-          ctx.fill();
-          ctx.stroke();
-        } else {
-          ctx.fillStyle = el.fill;
-          ctx.strokeStyle = el.stroke;
-          ctx.lineWidth = el.strokeW;
-          if (el.shape === "rect") {
-            ctx.fillRect(el.x, el.y, el.w, el.h);
-            ctx.strokeRect(el.x, el.y, el.w, el.h);
-          } else if (el.shape === "circle") {
+        ctx.fillStyle = el.fill;
+        ctx.strokeStyle = el.stroke;
+        ctx.lineWidth = el.strokeW;
+        if (el.shape === "rect") {
+          if (el.borderRadius > 0) {
             ctx.beginPath();
-            ctx.ellipse(el.x + el.w/2, el.y + el.h/2, el.w/2, el.h/2, 0, 0, Math.PI * 2);
+            ctx.roundRect(el.x, el.y, el.w, el.h, el.borderRadius);
             ctx.fill();
             ctx.stroke();
+          } else {
+            ctx.fillRect(el.x, el.y, el.w, el.h);
+            ctx.strokeRect(el.x, el.y, el.w, el.h);
           }
+        } else if (el.shape === "circle") {
+          ctx.beginPath();
+          ctx.ellipse(el.x + el.w/2, el.y + el.h/2, el.w/2, el.h/2, 0, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.stroke();
         }
       }
       ctx.restore();
@@ -5512,23 +5755,7 @@ export default function CanvasEditor() {
         let tx=el.x; if(el.align==="center") tx=el.x+el.w/2; if(el.align==="right") tx=el.x+el.w;
         const textY = el.y + el.fontSize;
         
-        if (el.useGradient && el.gradientColors && el.gradientColors.length >= 2) {
-          const gradient = el.gradientType === "linear"
-            ? ctx.createLinearGradient(tx, textY - el.fontSize, tx + (el.w || 100), textY + el.fontSize/2)
-            : ctx.createRadialGradient(tx + (el.w || 100)/2, textY - el.fontSize/2, 5, tx + (el.w || 100)/2, textY - el.fontSize/2, Math.max(el.w || 100, el.fontSize));
-          el.gradientColors.forEach((color, idx) => {
-            gradient.addColorStop(idx / (el.gradientColors.length - 1), color);
-          });
-          ctx.fillStyle = gradient;
-        } else {
-          ctx.fillStyle = el.color;
-        }
-        
-        if (el.textOutline === "solid" && el.outlineWidth > 0) {
-          ctx.lineWidth = el.outlineWidth;
-          ctx.strokeStyle = el.outlineColor;
-          ctx.strokeText(el.text, tx, textY);
-        }
+        ctx.fillStyle = el.color;
         ctx.fillText(el.text, tx, textY);
       }
       else if (el.type==="shape" && el.imageSrc) {
@@ -5552,8 +5779,15 @@ export default function CanvasEditor() {
         ctx.strokeStyle = el.stroke;
         ctx.lineWidth = el.strokeW;
         if (el.shape === "rect") {
-          ctx.fillRect(el.x, el.y, el.w, el.h);
-          ctx.strokeRect(el.x, el.y, el.w, el.h);
+          if (el.borderRadius > 0) {
+            ctx.beginPath();
+            ctx.roundRect(el.x, el.y, el.w, el.h, el.borderRadius);
+            ctx.fill();
+            ctx.stroke();
+          } else {
+            ctx.fillRect(el.x, el.y, el.w, el.h);
+            ctx.strokeRect(el.x, el.y, el.w, el.h);
+          }
         } else if (el.shape === "circle") {
           ctx.beginPath();
           ctx.ellipse(el.x + el.w/2, el.y + el.h/2, el.w/2, el.h/2, 0, 0, Math.PI * 2);
@@ -5595,18 +5829,16 @@ export default function CanvasEditor() {
   const guideY2 = (canvasSize.h * 2) / 3;
 
   const getMenuItems = () => {
-    // Base menu items WITHOUT canvas tools
     const baseMenuItems = [
-      { id: "deselect", icon: <FiXCircle />, label: "X", action: () => { setSelId(null); setActiveFeature(null); }, danger: false, alwaysShow: true },
+      { id: "deselect", icon: <FiCheckCircle />, label: "Clear", action: () => { setSelId(null); setActiveFeature(null); }, danger: false, alwaysShow: true },
       { id: "upload-bg", icon: <FiImage />, label: "BG", action: () => uploadBgRef.current.click() },
       { id: "upload-img", icon: <FiUpload />, label: "Image", action: () => uploadImgRef.current.click() },
       { id: "text", icon: <FiType />, label: "Text", action: () => setActiveFeature(activeFeature === "addText" ? null : "addText"), active: activeFeature === "addText" },
       { id: "rect", icon: <FiSquare />, label: "Rect", action: () => addShape("rect") },
-      { id: "circle", icon: <FiSquare />, label: "Circle", action: () => addShape("circle") },
+      { id: "circle", icon: <FiCircleIcon />, label: "Circle", action: () => addShape("circle") },
       { id: "image-rect", icon: <FiImage />, label: "Img Rect", action: () => addShape("image-rect") },
       { id: "image-circle", icon: <FiImage />, label: "Img Circ", action: () => addShape("image-circle") },
       { id: "removeBg", icon: <FiRemoveBg />, label: "Remove BG", action: removeBackgroundFromCanvas, active: false },
-      { id: "gradient", icon: <MdGradient />, label: "Gradient", action: () => setActiveFeature(activeFeature === "gradient" ? null : "gradient"), active: activeFeature === "gradient" },
       { id: "bgColor", icon: <MdColorLens />, label: "BGColor", action: () => setActiveFeature(activeFeature === "bgColor" ? null : "bgColor"), active: activeFeature === "bgColor", colorDot: bgColor },
       { id: "bgOpacity", icon: <MdOpacity />, label: "BGOpacity", action: () => setActiveFeature(activeFeature === "bgOpacity" ? null : "bgOpacity"), active: activeFeature === "bgOpacity" },
       { id: "filters", icon: <FiSliders />, label: "Filters", action: () => setActiveFeature(activeFeature === "filters" ? null : "filters"), active: activeFeature === "filters" },
@@ -5620,14 +5852,13 @@ export default function CanvasEditor() {
     if (selEl && !editingTextId) {
       if (selEl.type === "text") {
         return [
-          { id: "deselect", icon: <FiXCircle />, label: "X", action: () => { setSelId(null); setActiveFeature(null); }, danger: false, alwaysShow: true },
+          { id: "deselect", icon: <FiCheckCircle />, label: "Clear", action: () => { setSelId(null); setActiveFeature(null); }, danger: false, alwaysShow: true },
           { id: "bold", icon: <FiBold />, label: "Bold", action: () => commitSel({ bold: !selEl.bold }), active: selEl.bold },
           { id: "italic", icon: <FiItalic />, label: "Italic", action: () => commitSel({ italic: !selEl.italic }), active: selEl.italic },
           { id: "underline", icon: <FiUnderline />, label: "Underline", action: () => commitSel({ underline: !selEl.underline }), active: selEl.underline },
           { id: "font", icon: <FiType />, label: "Font", action: () => setActiveFeature(activeFeature === "font" ? null : "font"), active: activeFeature === "font" },
           { id: "size", icon: <FiType />, label: "Size", action: () => setActiveFeature(activeFeature === "size" ? null : "size"), active: activeFeature === "size" },
           { id: "color", icon: <MdColorLens />, label: "Color", action: () => setActiveFeature(activeFeature === "color" ? null : "color"), active: activeFeature === "color", colorDot: selEl.useGradient ? "gradient" : selEl.color },
-          { id: "gradient", icon: <MdGradient />, label: "Gradient", action: () => { setTempGradientColors(selEl.gradientColors || ["#FF6B6B", "#4ECDC4"]); setTempGradientType(selEl.gradientType || "linear"); setActiveFeature(activeFeature === "textGradient" ? null : "textGradient"); }, active: activeFeature === "textGradient" },
           { id: "outline", icon: <FiBox />, label: "Outline", action: () => setActiveFeature(activeFeature === "outline" ? null : "outline"), active: activeFeature === "outline" },
           { id: "shadow", icon: <FiBox />, label: "Shadow", action: () => setActiveFeature(activeFeature === "textShadow" ? null : "textShadow"), active: activeFeature === "textShadow" },
           { id: "lineHeight", icon: <MdFormatLineSpacing />, label: "Line Ht", action: () => setActiveFeature(activeFeature === "lineHeight" ? null : "lineHeight"), active: activeFeature === "lineHeight" },
@@ -5653,7 +5884,7 @@ export default function CanvasEditor() {
       }
       if (selEl.type === "shape") {
         const items = [
-          { id: "deselect", icon: <FiXCircle />, label: "X", action: () => { setSelId(null); setActiveFeature(null); }, danger: false, alwaysShow: true },
+          { id: "deselect", icon: <FiCheckCircle />, label: "Clear", action: () => { setSelId(null); setActiveFeature(null); }, danger: false, alwaysShow: true },
           { id: "fill", icon: <MdColorLens />, label: "Fill", action: () => setActiveFeature(activeFeature === "fillColor" ? null : "fillColor"), active: activeFeature === "fillColor", colorDot: selEl.fill !== "transparent" ? selEl.fill : null },
           { id: "uploadImage", icon: <FiUpload />, label: "Add Img", action: () => document.getElementById(`shape-image-upload-${selEl.id}`).click(), active: false },
           { id: "stroke", icon: <FiSquare />, label: "Stroke", action: () => setActiveFeature(activeFeature === "strokeColor" ? null : "strokeColor"), active: activeFeature === "strokeColor", colorDot: selEl.stroke },
@@ -5685,9 +5916,12 @@ export default function CanvasEditor() {
       }
       if (selEl.type === "image") {
         return [
-          { id: "deselect", icon: <FiXCircle />, label: "X", action: () => { setSelId(null); setActiveFeature(null); }, danger: false, alwaysShow: true },
+          { id: "deselect", icon: <FiCheckCircle />, label: "Clear", action: () => { setSelId(null); setActiveFeature(null); }, danger: false, alwaysShow: true },
           { id: "flip", icon: <FiMove />, label: "Flip", action: flipElement, active: selEl.flip },
           { id: "removeBg", icon: <FiRemoveBg />, label: "Remove BG", action: removeBackgroundFromCanvas, active: false },
+          { id: "crop", icon: <FiCrop />, label: "Crop", action: () => startCrop(selEl.id, selEl), active: isCropping },
+          { id: "size", icon: <MdPhotoSizeSelectLarge />, label: "Size", action: () => setActiveFeature(activeFeature === "imageSize" ? null : "imageSize"), active: activeFeature === "imageSize" },
+          { id: "shape", icon: <MdAspectRatio />, label: "Shape", action: () => setActiveFeature(activeFeature === "imageShape" ? null : "imageShape"), active: activeFeature === "imageShape" },
           { id: "shadow", icon: <FiBox />, label: "Shadow", action: () => setActiveFeature(activeFeature === "imageShadow" ? null : "imageShadow"), active: activeFeature === "imageShadow" },
           { id: "borderRadius", icon: <MdBorderAll />, label: "Radius", action: () => setActiveFeature(activeFeature === "imageRadius" ? null : "imageRadius"), active: activeFeature === "imageRadius" },
           { id: "blur", icon: <MdBlurOn />, label: "Blur", action: () => setActiveFeature(activeFeature === "imageBlur" ? null : "imageBlur"), active: activeFeature === "imageBlur" },
@@ -5739,18 +5973,97 @@ export default function CanvasEditor() {
     if (!showGrid && !showGuides && !showBleed && !showFolds) return null;
     return (
       <div style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 10 }}>
-        {showGrid && <div style={{ position: "absolute", inset: 0, backgroundImage: `linear-gradient(rgba(99,102,241,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.15) 1px, transparent 1px)`, backgroundSize: `${40 * zoom}px ${40 * zoom}px` }} />}
+        {showGrid && <div style={{ position: "absolute", inset: 0, backgroundImage: `linear-gradient(rgba(99,102,241,0.15) 1px, transparent 1px), linear-gradient(90deg, rgba(99,102,241,0.15) 1px, transparent 1px)`, backgroundSize: `${40 * canvasZoom}px ${40 * canvasZoom}px` }} />}
         {showGuides && <>
-          <div style={{ position: "absolute", left: guideX1*zoom, top: 0, width: 1, height: "100%", background: "rgba(255,0,0,0.4)" }} />
-          <div style={{ position: "absolute", left: guideX2*zoom, top: 0, width: 1, height: "100%", background: "rgba(255,0,0,0.4)" }} />
-          <div style={{ position: "absolute", top: guideY1*zoom, left: 0, width: "100%", height: 1, background: "rgba(255,0,0,0.4)" }} />
-          <div style={{ position: "absolute", top: guideY2*zoom, left: 0, width: "100%", height: 1, background: "rgba(255,0,0,0.4)" }} />
+          <div style={{ position: "absolute", left: guideX1*canvasZoom, top: 0, width: 1, height: "100%", background: "rgba(255,0,0,0.4)" }} />
+          <div style={{ position: "absolute", left: guideX2*canvasZoom, top: 0, width: 1, height: "100%", background: "rgba(255,0,0,0.4)" }} />
+          <div style={{ position: "absolute", top: guideY1*canvasZoom, left: 0, width: "100%", height: 1, background: "rgba(255,0,0,0.4)" }} />
+          <div style={{ position: "absolute", top: guideY2*canvasZoom, left: 0, width: "100%", height: 1, background: "rgba(255,0,0,0.4)" }} />
         </>}
-        {showBleed && <div style={{ position: "absolute", left: bleedSize*zoom, top: bleedSize*zoom, right: bleedSize*zoom, bottom: bleedSize*zoom, border: "1px dashed rgba(220,38,38,0.5)" }} />}
+        {showBleed && <div style={{ position: "absolute", left: bleedSize*canvasZoom, top: bleedSize*canvasZoom, right: bleedSize*canvasZoom, bottom: bleedSize*canvasZoom, border: "1px dashed rgba(220,38,38,0.5)" }} />}
         {showFolds && <>
-          <div style={{ position: "absolute", left: foldX*zoom, top: 0, width: 2, height: "100%", borderLeft: "2px dashed rgba(59,130,246,0.7)" }} />
-          <div style={{ position: "absolute", top: foldY*zoom, left: 0, width: "100%", height: 2, borderTop: "2px dashed rgba(59,130,246,0.7)" }} />
+          <div style={{ position: "absolute", left: foldX*canvasZoom, top: 0, width: 2, height: "100%", borderLeft: "2px dashed rgba(59,130,246,0.7)" }} />
+          <div style={{ position: "absolute", top: foldY*canvasZoom, left: 0, width: "100%", height: 2, borderTop: "2px dashed rgba(59,130,246,0.7)" }} />
         </>}
+      </div>
+    );
+  };
+
+  const CropOverlay = () => {
+    if (!isCropping || !cropElementId) return null;
+    
+    const element = elements.find(el => el.id === cropElementId);
+    if (!element) return null;
+    
+    return (
+      <div
+        style={{
+          position: "absolute",
+          inset: 0,
+          zIndex: 100,
+          cursor: "crosshair",
+          background: "rgba(0,0,0,0.55)"
+        }}
+        onMouseDown={handleCropMouseDown}
+        onMouseMove={handleCropMouseMove}
+        onMouseUp={handleCropMouseUp}
+      >
+        {cropSelection && cropSelection.w > 0 && cropSelection.h > 0 && (
+          <div
+            style={{
+              position: "absolute",
+              left: cropSelection.x * canvasZoom,
+              top: cropSelection.y * canvasZoom,
+              width: cropSelection.w * canvasZoom,
+              height: cropSelection.h * canvasZoom,
+              border: "2px solid #fff",
+              background: "rgba(99,102,241,0.2)",
+              boxSizing: "border-box",
+              boxShadow: "0 0 0 1px rgba(0,0,0,0.3)",
+              pointerEvents: "none"
+            }}
+          >
+            <div style={{ position: "absolute", left: "33.3%", top: 0, width: 1, height: "100%", background: "rgba(255,255,255,0.5)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: "66.6%", top: 0, width: 1, height: "100%", background: "rgba(255,255,255,0.5)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: 0, top: "33.3%", width: "100%", height: 1, background: "rgba(255,255,255,0.5)", pointerEvents: "none" }} />
+            <div style={{ position: "absolute", left: 0, top: "66.6%", width: "100%", height: 1, background: "rgba(255,255,255,0.5)", pointerEvents: "none" }} />
+          </div>
+        )}
+        
+        <div style={{
+          position: "fixed",
+          bottom: 80,
+          left: "50%",
+          transform: "translateX(-50%)",
+          background: "#1e1e2e",
+          borderRadius: 12,
+          padding: "8px 16px",
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          boxShadow: "0 4px 20px rgba(0,0,0,0.4)",
+          zIndex: 200
+        }}>
+          <span style={{ color: "#aaa", fontSize: 12, fontFamily: "monospace" }}>
+            Drag to select area to crop
+          </span>
+          <div style={{ width: 1, height: 20, background: "#444" }} />
+          <button
+            onClick={(e) => { e.stopPropagation(); cancelCrop(); }}
+            style={{
+              padding: "6px 14px",
+              background: "#374151",
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              cursor: "pointer",
+              fontWeight: 600,
+              fontSize: 13
+            }}
+          >
+            Cancel
+          </button>
+        </div>
       </div>
     );
   };
@@ -5758,7 +6071,7 @@ export default function CanvasEditor() {
   const CanvasArea = () => (
     <div ref={canvasAreaRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
       onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp}
-      style={{ position: "relative", width: canvasSize.w * zoom, height: canvasSize.h * zoom, cursor: "default", userSelect: "none", touchAction: "none", boxShadow: "0 4px 32px rgba(0,0,0,0.2)", borderRadius: 4, overflow: "hidden", background: getBgStyle(), margin: "auto" }}>
+      style={{ position: "relative", width: canvasSize.w * canvasZoom, height: canvasSize.h * canvasZoom, cursor: "default", userSelect: "none", touchAction: "none", boxShadow: "0 4px 32px rgba(0,0,0,0.2)", borderRadius: 4, overflow: "hidden", background: getBgStyle(), margin: "auto" }}>
       {bgImage && <img src={bgImage} alt="bg" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: bgOpacity / 100, filter: bgFilter, pointerEvents: "none" }} />}
       <GuidesOverlay />
       {elements.map(el => {
@@ -5766,17 +6079,18 @@ export default function CanvasEditor() {
           return (
             <textarea key={el.id} ref={textInputRef} value={editingTextValue} onChange={e => setEditingTextValue(e.target.value)} onBlur={finishInlineEdit} onKeyDown={handleTextKeyDown}
               onPointerDown={e => e.stopPropagation()} onPointerMove={e => e.stopPropagation()} onTouchStart={e => e.stopPropagation()} onTouchMove={e => e.stopPropagation()}
-              style={{ position: "absolute", left: el.x * zoom, top: el.y * zoom, width: (el.w || 100) * zoom, height: (el.h || 60) * zoom,
-                fontSize: el.fontSize * zoom, fontFamily: el.fontFamily, color: el.color, fontWeight: el.bold ? 700 : 400,
+              style={{ position: "absolute", left: el.x * canvasZoom, top: el.y * canvasZoom, width: (el.w || 100) * canvasZoom, height: (el.h || 60) * canvasZoom,
+                fontSize: el.fontSize * canvasZoom, fontFamily: el.fontFamily, color: el.color, fontWeight: el.bold ? 700 : 400,
                 fontStyle: el.italic ? "italic" : "normal", textDecoration: el.underline ? "underline" : "none", textAlign: el.align || "left",
                 border: `2px solid ${ACCENT}`, borderRadius: 4, padding: "4px 8px", background: "transparent", outline: "none", zIndex: 20,
                 boxSizing: "border-box", resize: "none", overflow: "hidden", lineHeight: el.lineHeight || 1.3, letterSpacing: `${el.letterSpacing || 0}px`, caretColor: el.color }} />
           );
         }
-        return <ElView key={el.id} el={el} zoom={zoom} />;
+        return <ElView key={el.id} el={el} zoom={canvasZoom} />;
       })}
-      {selEl && !editingTextId && <SelectBox el={selEl} zoom={zoom} />}
+      {selEl && !editingTextId && !isCropping && <SelectBox el={selEl} zoom={canvasZoom} />}
       {elements.map(el => el.type === "shape" && <input key={`upload-${el.id}`} id={`shape-image-upload-${el.id}`} type="file" accept="image/*" style={{ display: "none" }} onChange={(e) => handleShapeImageUpload(e, el.id)} />)}
+      <CropOverlay />
     </div>
   );
 
@@ -5790,6 +6104,182 @@ export default function CanvasEditor() {
       </div>
     );
 
+    // Enhanced Text Shadow Popup with Color Picker
+    if (activeFeature === "textShadow" && selEl && selEl.type === "text") {
+      // Load current shadow values
+      const currentShadow = selEl.textShadow && selEl.textShadow !== "none" 
+        ? selEl.textShadow 
+        : "2px 2px 4px rgba(0,0,0,0.3)";
+      
+      // Parse shadow or use defaults
+      let shadowX = 2, shadowY = 2, shadowBlur = 4, shadowColor = "rgba(0,0,0,0.3)";
+      const shadowMatch = currentShadow.match(/([-\d]+)px\s+([-\d]+)px\s+(\d+)px\s+(.+)/);
+      if (shadowMatch) {
+        shadowX = parseInt(shadowMatch[1]);
+        shadowY = parseInt(shadowMatch[2]);
+        shadowBlur = parseInt(shadowMatch[3]);
+        shadowColor = shadowMatch[4];
+      }
+      
+      // Convert rgba to hex for color picker if possible
+      let hexColor = "#000000";
+      const rgbaMatch = shadowColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+      if (rgbaMatch) {
+        hexColor = "#" + ((1 << 24) + (parseInt(rgbaMatch[1]) << 16) + (parseInt(rgbaMatch[2]) << 8) + parseInt(rgbaMatch[3])).toString(16).slice(1);
+      } else if (shadowColor.startsWith("#")) {
+        hexColor = shadowColor;
+      }
+      
+      return (
+        <div style={popupStyle}>
+          <Header title="Text Shadow" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Shadow X Offset: {shadowX}px</div>
+              <input type="range" min={-20} max={20} value={shadowX} onChange={(e) => {
+                const val = parseInt(e.target.value);
+                commitSel({ textShadow: `${val}px ${shadowY}px ${shadowBlur}px ${shadowColor}` });
+              }} style={{ width: "100%" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Shadow Y Offset: {shadowY}px</div>
+              <input type="range" min={-20} max={20} value={shadowY} onChange={(e) => {
+                const val = parseInt(e.target.value);
+                commitSel({ textShadow: `${shadowX}px ${val}px ${shadowBlur}px ${shadowColor}` });
+              }} style={{ width: "100%" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Shadow Blur: {shadowBlur}px</div>
+              <input type="range" min={0} max={30} value={shadowBlur} onChange={(e) => {
+                const val = parseInt(e.target.value);
+                commitSel({ textShadow: `${shadowX}px ${shadowY}px ${val}px ${shadowColor}` });
+              }} style={{ width: "100%" }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 12, marginBottom: 4 }}>Shadow Color</div>
+              <input type="color" value={hexColor} onChange={(e) => {
+                const newColor = e.target.value;
+                const r = parseInt(newColor.slice(1,3), 16);
+                const g = parseInt(newColor.slice(3,5), 16);
+                const b = parseInt(newColor.slice(5,7), 16);
+                const rgba = `rgba(${r}, ${g}, ${b}, 0.5)`;
+                commitSel({ textShadow: `${shadowX}px ${shadowY}px ${shadowBlur}px ${rgba}` });
+              }} style={{ width: "100%", height: 40, borderRadius: 6, cursor: "pointer" }} />
+            </div>
+            <div style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={() => commitSel({ textShadow: "2px 2px 4px rgba(0,0,0,0.3)" })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer", fontSize: 11 }}>Small Dark</button>
+              <button onClick={() => commitSel({ textShadow: "4px 4px 8px rgba(0,0,0,0.5)" })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer", fontSize: 11 }}>Large Dark</button>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => commitSel({ textShadow: "2px 2px 4px rgba(255,0,0,0.4)" })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#fee2e2", cursor: "pointer", fontSize: 11, color: "#dc2626" }}>Red Shadow</button>
+              <button onClick={() => commitSel({ textShadow: "2px 2px 4px rgba(0,0,255,0.4)" })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#dbeafe", cursor: "pointer", fontSize: 11, color: "#2563eb" }}>Blue Shadow</button>
+            </div>
+            <button onClick={() => commitSel({ textShadow: "none" })} style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>Remove Shadow</button>
+          </div>
+        </div>
+      );
+    }
+
+    // Enhanced Color Picker with Gradient Option
+    if (activeFeature === "color" && selEl) {      
+      return (
+        <div style={popupStyle}>
+          <Header title="Text Color" />
+          <input type="color" value={selEl.color || "#000000"} onChange={e => commitSel({ color: e.target.value, useGradient: false })} style={{ width: "100%", height: 50, borderRadius: 8, border: "1px solid #e5e7eb", cursor: "pointer" }} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginTop: 12 }}>
+            {COLOR_PRESETS.map(c => (
+              <div key={c} onClick={() => commitSel({ color: c, useGradient: false })} style={{ width: "100%", aspectRatio: "1/1", borderRadius: 8, background: c, cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd", transition: "transform 0.1s ease" }} />
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginTop: 8 }}>
+            {["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF", "#FFA500", "#800080", "#008000", "#FFC0CB"].map(c => (
+              <div key={c} onClick={() => commitSel({ color: c, useGradient: false })} style={{ width: "100%", aspectRatio: "1/1", borderRadius: 8, background: c, cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
+            ))}
+          </div>
+          <button onClick={() => commitSel({ useGradient: false })} style={{ marginTop: 12, width: "100%", padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer" }}>Solid Color Only</button>
+        </div>
+      );
+    }
+
+    // Image Size Adjustment Popup
+    if (activeFeature === "imageSize" && selEl && selEl.type === "image") {
+      return (
+        <div style={popupStyle}>
+          <Header title="Adjust Image Size" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, marginBottom: 8 }}>Width: {Math.round(selEl.w)}px | Height: {Math.round(selEl.h)}px</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <FiMinimize size={14} />
+                <input 
+                  type="range" 
+                  min={20} 
+                  max={500} 
+                  value={selEl.w} 
+                  onChange={(e) => {
+                    const newW = parseInt(e.target.value);
+                    const aspectRatio = selEl.w / selEl.h;
+                    commitSel({ w: newW, h: newW / aspectRatio });
+                  }} 
+                  style={{ flex: 1 }}
+                />
+                <FiMaximize size={14} />
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={() => adjustImageSize(100)} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>Reset</button>
+              <button onClick={() => {
+                const newW = selEl.w * 1.2;
+                const aspectRatio = selEl.w / selEl.h;
+                commitSel({ w: newW, h: newW / aspectRatio });
+              }} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>Enlarge 20%</button>
+              <button onClick={() => {
+                const newW = selEl.w * 0.8;
+                const aspectRatio = selEl.w / selEl.h;
+                commitSel({ w: newW, h: newW / aspectRatio });
+              }} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>Shrink 20%</button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Image Shape/Aspect Ratio Adjustment Popup
+    if (activeFeature === "imageShape" && selEl && selEl.type === "image") {
+      return (
+        <div style={popupStyle}>
+          <Header title="Adjust Image Shape" />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8 }}>
+            <button onClick={() => adjustImageShape("original")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>
+              <MdAspectRatio size={18} /><br/>Original
+            </button>
+            <button onClick={() => adjustImageShape("square")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>
+              ⬜<br/>Square 1:1
+            </button>
+            <button onClick={() => adjustImageShape("portrait")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>
+              📱<br/>Portrait 3:4
+            </button>
+            <button onClick={() => adjustImageShape("landscape")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>
+              🖥️<br/>Landscape 4:3
+            </button>
+            <button onClick={() => adjustImageShape("circle")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>
+              ⚪<br/>Circle
+            </button>
+            <button onClick={() => {
+              const newW = selEl.h;
+              const newH = selEl.h;
+              commitSel({ w: newW, h: newH, borderRadius: 0 });
+            }} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>
+              🔲<br/>Equal W/H
+            </button>
+          </div>
+          <div style={{ marginTop: 12, padding: 8, background: "#eef2ff", borderRadius: 8, fontSize: 11, textAlign: "center", color: ACCENT }}>
+            Current: {Math.round(selEl.w)} × {Math.round(selEl.h)}
+          </div>
+        </div>
+      );
+    }
+
     if (activeFeature === "addText") return (
       <div style={popupStyle}>
         <Header title="Add Text" />
@@ -5797,28 +6287,7 @@ export default function CanvasEditor() {
           <textarea value={tText} onChange={e => setTText(e.target.value)} style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10, fontSize: 14, resize: "none", height: 70, boxSizing: "border-box" }} />
           <select value={tFont} onChange={e => setTFont(e.target.value)} style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8, fontSize: 13 }}>{FONTS.map(f => <option key={f}>{f}</option>)}</select>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 12, color: "#666", width: 50 }}>Size {tSize}</span><input type="range" min={8} max={200} value={tSize} onChange={e => setTSize(+e.target.value)} style={{ flex: 1 }} /></div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 8 }}>
-            <button onClick={() => setTUseGradient(false)} style={{ flex: 1, padding: 8, borderRadius: 8, background: !tUseGradient ? ACCENT : "#f3f4f6", color: !tUseGradient ? "#fff" : "#333", border: "none", cursor: "pointer", fontSize: 12 }}>Solid</button>
-            <button onClick={() => setTUseGradient(true)} style={{ flex: 1, padding: 8, borderRadius: 8, background: tUseGradient ? ACCENT : "#f3f4f6", color: tUseGradient ? "#fff" : "#333", border: "none", cursor: "pointer", fontSize: 12 }}>Gradient</button>
-          </div>
-          {!tUseGradient ? (
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 12, color: "#666" }}>Color</span><input type="color" value={tColor} onChange={e => setTColor(e.target.value)} style={{ width: 40, height: 34, borderRadius: 6, border: "none", cursor: "pointer" }} /></div>
-          ) : (
-            <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={() => setTGradientType("linear")} style={{ flex: 1, padding: 6, borderRadius: 6, background: tGradientType === "linear" ? ACCENT : "#f3f4f6", color: tGradientType === "linear" ? "#fff" : "#333", border: "none", cursor: "pointer", fontSize: 11 }}>Linear</button>
-                <button onClick={() => setTGradientType("radial")} style={{ flex: 1, padding: 6, borderRadius: 6, background: tGradientType === "radial" ? ACCENT : "#f3f4f6", color: tGradientType === "radial" ? "#fff" : "#333", border: "none", cursor: "pointer", fontSize: 11 }}>Radial</button>
-              </div>
-              {tGradientColors.map((color, idx) => (
-                <div key={idx} style={{ display: "flex", gap: 8 }}>
-                  <input type="color" value={color} onChange={e => { const newColors = [...tGradientColors]; newColors[idx] = e.target.value; setTGradientColors(newColors); }} style={{ width: 50, height: 34, borderRadius: 6, border: "none", cursor: "pointer" }} />
-                  <input type="text" value={color} onChange={e => { const newColors = [...tGradientColors]; newColors[idx] = e.target.value; setTGradientColors(newColors); }} style={{ flex: 1, padding: 6, borderRadius: 6, border: "1px solid #e5e7eb", fontSize: 12 }} />
-                  {tGradientColors.length > 2 && <button onClick={() => setTGradientColors(tGradientColors.filter((_, i) => i !== idx))} style={{ padding: "6px 10px", background: "#fee2e2", border: "none", borderRadius: 6, cursor: "pointer", color: "#dc2626" }}><FiTrash2 size={12} /></button>}
-                </div>
-              ))}
-              {tGradientColors.length < 5 && <button onClick={() => setTGradientColors([...tGradientColors, "#888888"])} style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>+ Add Color</button>}
-            </div>
-          )}
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 12, color: "#666" }}>Color</span><input type="color" value={tColor} onChange={e => setTColor(e.target.value)} style={{ width: 40, height: 34, borderRadius: 6, border: "none", cursor: "pointer" }} /></div>
           <div style={{ display: "flex", gap: 6 }}>
             {[["B", () => setTBold(!tBold), tBold], ["I", () => setTItalic(!tItalic), tItalic], ["U", () => setTUnderline(!tUnderline), tUnderline]].map(([l, a, on]) => (<button key={l} onClick={a} style={{ flex: 1, padding: 8, borderRadius: 6, border: "none", background: on ? ACCENT : "#f3f4f6", color: on ? "#fff" : "#333", fontWeight: 700, cursor: "pointer" }}>{l}</button>))}
             <button onClick={() => setTAlign("left")} style={{ flex: 1, padding: 8, borderRadius: 6, border: "none", background: tAlign === "left" ? ACCENT : "#f3f4f6", cursor: "pointer", color: tAlign === "left" ? "#fff" : "#333" }}><FiAlignLeft /></button>
@@ -5826,69 +6295,6 @@ export default function CanvasEditor() {
             <button onClick={() => setTAlign("right")} style={{ flex: 1, padding: 8, borderRadius: 6, border: "none", background: tAlign === "right" ? ACCENT : "#f3f4f6", cursor: "pointer", color: tAlign === "right" ? "#fff" : "#333" }}><FiAlignRight /></button>
           </div>
           <button onClick={addText} style={{ padding: 12, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600 }}>Add Text to Canvas</button>
-        </div>
-      </div>
-    );
-
-    if (activeFeature === "textGradient" && selEl && selEl.type === "text") {
-      const updateColors = (index, value) => {
-        const newColors = [...tempGradientColors];
-        newColors[index] = value;
-        setTempGradientColors(newColors);
-        commitSel({ gradientColors: newColors, useGradient: true, gradientType: tempGradientType });
-      };
-      
-      const addColor = () => {
-        if (tempGradientColors.length < 5) {
-          const newColors = [...tempGradientColors, "#888888"];
-          setTempGradientColors(newColors);
-          commitSel({ gradientColors: newColors, useGradient: true, gradientType: tempGradientType });
-        }
-      };
-      
-      const removeColor = (index) => {
-        if (tempGradientColors.length > 2) {
-          const newColors = tempGradientColors.filter((_, i) => i !== index);
-          setTempGradientColors(newColors);
-          commitSel({ gradientColors: newColors, useGradient: true, gradientType: tempGradientType });
-        }
-      };
-      
-      return (
-        <div style={popupStyle}>
-          <Header title="Text Gradient" />
-          <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
-            <button onClick={() => { setTempGradientType("linear"); commitSel({ gradientType: "linear", useGradient: true }); }} style={{ flex: 1, padding: 8, borderRadius: 6, background: tempGradientType === "linear" ? ACCENT : "#f3f4f6", color: tempGradientType === "linear" ? "#fff" : "#333", border: "none", cursor: "pointer" }}>Linear</button>
-            <button onClick={() => { setTempGradientType("radial"); commitSel({ gradientType: "radial", useGradient: true }); }} style={{ flex: 1, padding: 8, borderRadius: 6, background: tempGradientType === "radial" ? ACCENT : "#f3f4f6", color: tempGradientType === "radial" ? "#fff" : "#333", border: "none", cursor: "pointer" }}>Radial</button>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-            {tempGradientColors.map((color, idx) => (
-              <div key={idx} style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <input type="color" value={color} onChange={(e) => updateColors(idx, e.target.value)} style={{ width: 50, height: 40, borderRadius: 6, border: "1px solid #e5e7eb", cursor: "pointer" }} />
-                <input type="text" value={color} onChange={(e) => updateColors(idx, e.target.value)} style={{ flex: 1, padding: 8, borderRadius: 6, border: "1px solid #e5e7eb", fontSize: 12 }} />
-                {tempGradientColors.length > 2 && <button onClick={() => removeColor(idx)} style={{ padding: "6px 10px", background: "#fee2e2", border: "none", borderRadius: 6, cursor: "pointer", color: "#dc2626" }}><FiTrash2 size={12} /></button>}
-              </div>
-            ))}
-            {tempGradientColors.length < 5 && <button onClick={addColor} style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontSize: 12 }}>+ Add Color Stop</button>}
-          </div>
-          <button onClick={() => { commitSel({ useGradient: false }); setActiveFeature(null); }} style={{ marginTop: 12, padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, width: "100%", cursor: "pointer" }}>Disable Gradient</button>
-        </div>
-      );
-    }
-
-    if (activeFeature === "gradient") return (
-      <div style={popupStyle}>
-        <Header title="Gradient Background" />
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => applyGradientBg("linear", ["#ff6b6b", "#4ecdc4"])} style={{ flex: 1, padding: 8, borderRadius: 8, background: "linear-gradient(135deg, #ff6b6b, #4ecdc4)", color: "#fff", border: "none", cursor: "pointer" }}>Sunset</button>
-            <button onClick={() => applyGradientBg("linear", ["#667eea", "#764ba2"])} style={{ flex: 1, padding: 8, borderRadius: 8, background: "linear-gradient(135deg, #667eea, #764ba2)", color: "#fff", border: "none", cursor: "pointer" }}>Purple</button>
-          </div>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => applyGradientBg("linear", ["#f7971e", "#ffd200"])} style={{ flex: 1, padding: 8, borderRadius: 8, background: "linear-gradient(135deg, #f7971e, #ffd200)", color: "#333", border: "none", cursor: "pointer" }}>Golden</button>
-            <button onClick={() => applyGradientBg("radial", ["#3494e6", "#ec6ead"])} style={{ flex: 1, padding: 8, borderRadius: 8, background: "radial-gradient(circle, #3494e6, #ec6ead)", color: "#fff", border: "none", cursor: "pointer" }}>Radial</button>
-          </div>
-          <button onClick={() => { setBgGradient(null); setBgColor("#ffffff"); }} style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer" }}>Reset to Solid</button>
         </div>
       </div>
     );
@@ -5907,18 +6313,7 @@ export default function CanvasEditor() {
       </div>
     );
 
-    if (activeFeature === "textShadow" && selEl && selEl.type === "text") return (
-      <div style={popupStyle}>
-        <Header title="Text Shadow" />
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => commitSel({ textShadow: "2px 2px 4px rgba(0,0,0,0.3)" })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>Small</button>
-            <button onClick={() => commitSel({ textShadow: "4px 4px 8px rgba(0,0,0,0.5)" })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>Large</button>
-          </div>
-          <button onClick={() => commitSel({ textShadow: "none" })} style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer" }}>Remove Shadow</button>
-        </div>
-      </div>
-    );
+    // Note: textShadow popup is already handled above with enhanced version
 
     if (activeFeature === "shapeShadow" && selEl && selEl.type === "shape") return (
       <div style={popupStyle}>
@@ -6019,14 +6414,8 @@ export default function CanvasEditor() {
       <div style={popupStyle}><Header title="Select Font" /><select value={selEl.fontFamily} onChange={e => { commitSel({ fontFamily: e.target.value }); setActiveFeature(null); }} style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 14 }}>{FONTS.map(f => <option key={f}>{f}</option>)}</select></div>
     );
 
-    if (activeFeature === "size" && selEl) return (
+    if (activeFeature === "size" && selEl && selEl.type === "text") return (
       <div style={popupStyle}><Header title="Font Size" /><input type="range" min={8} max={200} value={selEl.fontSize} onChange={e => commitSel({ fontSize: +e.target.value })} style={{ width: "100%" }} /><div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.fontSize}px</div></div>
-    );
-
-    if (activeFeature === "color" && selEl) return (
-      <div style={popupStyle}><Header title="Text Color" /><input type="color" value={selEl.color} onChange={e => commitSel({ color: e.target.value, useGradient: false })} style={{ width: "100%", height: 50, borderRadius: 8, border: "none", cursor: "pointer" }} />
-        <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>{COLOR_PRESETS.map(c => <div key={c} onClick={() => commitSel({ color: c, useGradient: false })} style={{ width: 30, height: 30, borderRadius: 15, background: c, cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />)}</div>
-      </div>
     );
 
     if (activeFeature === "lineHeight" && selEl) return (
@@ -6075,7 +6464,12 @@ export default function CanvasEditor() {
     );
 
     if (activeFeature === "bgColor") return (
-      <div style={popupStyle}><Header title="Background Color" /><input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: "100%", height: 50, borderRadius: 8 }} /><div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>{COLOR_PRESETS.map(c => <div key={c} onClick={() => setBgColor(c)} style={{ width: 30, height: 30, borderRadius: 15, background: c, cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />)}</div></div>
+      <div style={popupStyle}><Header title="Background Color" /><input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: "100%", height: 50, borderRadius: 8 }} /><div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>{COLOR_PRESETS.map(c => <div key={c} onClick={() => setBgColor(c)} style={{ width: 30, height: 30, borderRadius: 15, background: c, cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />)}</div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginTop: 8 }}>
+        {["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF", "#FFA500", "#800080", "#008000", "#FFC0CB"].map(c => (
+          <div key={c} onClick={() => setBgColor(c)} style={{ width: "100%", aspectRatio: "1/1", borderRadius: 8, background: c, cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
+        ))}
+      </div></div>
     );
 
     if (activeFeature === "bgOpacity") return (
@@ -6108,7 +6502,7 @@ export default function CanvasEditor() {
         {isLoadingData && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ background: "#fff", borderRadius: 20, padding: 32, textAlign: "center" }}><div style={{ fontSize: 40, marginBottom: 16, animation: "spin 1s linear infinite" }}>🎨</div><div style={{ fontSize: 16, fontWeight: 600 }}>Loading Design...</div></div></div>)}
         <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg,${ACCENT},#ec4899)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>C</div><input value={designTitle} onChange={e => setDesignTitle(e.target.value)} style={{ flex: 1, border: "1px solid #eee", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 500, minWidth: 0 }} /><button onClick={undo} disabled={hIdx <= 0} style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #eee", background: "#fff", cursor: "pointer", fontSize: 14 }}>↩</button><button onClick={redo} disabled={hIdx >= history.length - 1} style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #eee", background: "#fff", cursor: "pointer", fontSize: 14 }}>↪</button><button onClick={saveDesignToServer} style={{ padding: "6px 12px", borderRadius: 8, background: `linear-gradient(135deg,${ACCENT},#ec4899)`, color: "#fff", border: "none", fontSize: 12, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}><FiSave size={12} /> Save</button></div>
         <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 12px" }}><CanvasArea /></div>
-        <div style={{ position: "fixed", right: 12, bottom: 75, zIndex: 50, display: "flex", flexDirection: "column", gap: 8 }}><button onClick={() => setZoom(z => Math.min(2, +(z+0.1).toFixed(1)))} style={{ width: 40, height: 40, borderRadius: 40, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><FiZoomIn /></button><button onClick={() => setZoom(z => Math.max(0.2, +(z-0.1).toFixed(1)))} style={{ width: 40, height: 40, borderRadius: 40, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><FiZoomOut /></button><div style={{ width: 40, height: 40, borderRadius: 40, background: ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>{Math.round(zoom*100)}%</div></div>
+        <div style={{ position: "fixed", right: 12, bottom: 75, zIndex: 50, display: "flex", flexDirection: "column", gap: 8 }}><button onClick={() => setCanvasZoom(z => Math.min(2, +(z+0.1).toFixed(1)))} style={{ width: 40, height: 40, borderRadius: 40, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><FiZoomIn /></button><button onClick={() => setCanvasZoom(z => Math.max(0.2, +(z-0.1).toFixed(1)))} style={{ width: 40, height: 40, borderRadius: 40, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><FiZoomOut /></button><div style={{ width: 40, height: 40, borderRadius: 40, background: ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>{Math.round(canvasZoom*100)}%</div></div>
         <input ref={uploadBgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleBgUpload} />
         <input ref={uploadImgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAddImage} />
         <UnifiedMenuBar />
@@ -6123,7 +6517,7 @@ export default function CanvasEditor() {
     <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#e0e0e6", overflow: "hidden" }}>
       <Toaster position="top-center" />
       {isLoadingData && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ background: "#fff", borderRadius: 16, padding: 24, textAlign: "center" }}><div style={{ fontSize: 32, animation: "spin 1s linear infinite" }}>🎨</div><div style={{ marginTop: 8, fontWeight: 600 }}>Loading Design...</div></div></div>)}
-      <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", height: 50, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", flexShrink: 0 }}><div style={{ width: 34, height: 34, borderRadius: 10, background: `linear-gradient(135deg,${ACCENT},#ec4899)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16 }}>C</div><input value={designTitle} onChange={e => setDesignTitle(e.target.value)} style={{ border: "1px solid #eee", borderRadius: 8, padding: "4px 12px", fontSize: 13, width: 200 }} /><div style={{ width: 1, height: 26, background: "#e5e7eb" }} /><button onClick={undo} disabled={hIdx <= 0} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #eee", background: "#fff", cursor: "pointer", fontSize: 13 }}>↩ Undo</button><button onClick={redo} disabled={hIdx >= history.length - 1} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #eee", background: "#fff", cursor: "pointer", fontSize: 13 }}>↪ Redo</button><div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}><button onClick={() => setZoom(z => Math.max(0.2, +(z-0.1).toFixed(1)))} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18 }}><FiZoomOut /></button><span style={{ fontSize: 12, minWidth: 42, textAlign: "center", fontWeight: 600 }}>{Math.round(zoom*100)}%</span><button onClick={() => setZoom(z => Math.min(2, +(z+0.1).toFixed(1)))} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18 }}><FiZoomIn /></button><div style={{ width: 1, height: 26, background: "#e5e7eb" }} /><button onClick={exportPNG} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 13 }}>Export PNG</button><button onClick={saveDesignToServer} style={{ padding: "5px 14px", borderRadius: 6, background: "#10b981", color: "#fff", border: "none", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 600 }}><FiSave size={14} /> Save</button></div></div>
+      <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", height: 50, display: "flex", alignItems: "center", gap: 10, padding: "0 16px", flexShrink: 0 }}><div style={{ width: 34, height: 34, borderRadius: 10, background: `linear-gradient(135deg,${ACCENT},#ec4899)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 16 }}>C</div><input value={designTitle} onChange={e => setDesignTitle(e.target.value)} style={{ border: "1px solid #eee", borderRadius: 8, padding: "4px 12px", fontSize: 13, width: 200 }} /><div style={{ width: 1, height: 26, background: "#e5e7eb" }} /><button onClick={undo} disabled={hIdx <= 0} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #eee", background: "#fff", cursor: "pointer", fontSize: 13 }}>↩ Undo</button><button onClick={redo} disabled={hIdx >= history.length - 1} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #eee", background: "#fff", cursor: "pointer", fontSize: 13 }}>↪ Redo</button><div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 8 }}><button onClick={() => setCanvasZoom(z => Math.max(0.2, +(z-0.1).toFixed(1)))} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18 }}><FiZoomOut /></button><span style={{ fontSize: 12, minWidth: 42, textAlign: "center", fontWeight: 600 }}>{Math.round(canvasZoom*100)}%</span><button onClick={() => setCanvasZoom(z => Math.min(2, +(z+0.1).toFixed(1)))} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 18 }}><FiZoomIn /></button><div style={{ width: 1, height: 26, background: "#e5e7eb" }} /><button onClick={exportPNG} style={{ padding: "5px 12px", borderRadius: 6, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer", fontSize: 13 }}>Export PNG</button><button onClick={saveDesignToServer} style={{ padding: "5px 14px", borderRadius: 6, background: "#10b981", color: "#fff", border: "none", display: "flex", alignItems: "center", gap: 6, cursor: "pointer", fontWeight: 600 }}><FiSave size={14} /> Save</button></div></div>
       <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "center", justifyContent: "center", padding: 32 }}><CanvasArea /></div>
       <input ref={uploadBgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleBgUpload} />
       <input ref={uploadImgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAddImage} />
@@ -6168,16 +6562,7 @@ function ElView({ el, zoom }) {
 
   if (el.type === "text") {
     const textOutlineStyle = el.textOutline === "solid" && el.outlineWidth > 0 ? `${el.outlineWidth * zoom}px ${el.outlineColor}` : "none";
-    const gradientStyle = el.useGradient && el.gradientColors && el.gradientColors.length >= 2
-      ? { background: el.gradientType === "linear" 
-          ? `linear-gradient(135deg, ${el.gradientColors.join(", ")})` 
-          : `radial-gradient(circle, ${el.gradientColors.join(", ")})`,
-        WebkitBackgroundClip: "text",
-        WebkitTextFillColor: "transparent",
-        backgroundClip: "text" }
-      : { color: el.color };
-    
-    const style = { ...base, ...gradientStyle, fontSize: el.fontSize * zoom, fontFamily: el.fontFamily, fontWeight: el.bold ? 700 : 400, fontStyle: el.italic ? "italic" : "normal", textDecoration: el.underline ? "underline" : "none", textAlign: el.align || "left", whiteSpace: "pre-wrap", lineHeight: el.lineHeight || 1.3, letterSpacing: `${el.letterSpacing || 0}px`, background: el.textBackground && el.textBackground !== "transparent" ? el.textBackground : "transparent", textShadow: el.textShadow && el.textShadow !== "none" ? el.textShadow : "none", WebkitTextStroke: textOutlineStyle !== "none" ? textOutlineStyle : undefined, WebkitTextStrokeWidth: textOutlineStyle !== "none" ? `${el.outlineWidth * zoom}px` : undefined, WebkitTextStrokeColor: textOutlineStyle !== "none" ? el.outlineColor : undefined, display: "flex", alignItems: "center", justifyContent: el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start", borderRadius: 4, padding: "2px 4px" };
+    const style = { ...base, color: el.color, fontSize: el.fontSize * zoom, fontFamily: el.fontFamily, fontWeight: el.bold ? 700 : 400, fontStyle: el.italic ? "italic" : "normal", textDecoration: el.underline ? "underline" : "none", textAlign: el.align || "left", whiteSpace: "pre-wrap", lineHeight: el.lineHeight || 1.3, letterSpacing: `${el.letterSpacing || 0}px`, background: el.textBackground && el.textBackground !== "transparent" ? el.textBackground : "transparent", textShadow: el.textShadow && el.textShadow !== "none" ? el.textShadow : "none", WebkitTextStroke: textOutlineStyle !== "none" ? textOutlineStyle : undefined, WebkitTextStrokeWidth: textOutlineStyle !== "none" ? `${el.outlineWidth * zoom}px` : undefined, WebkitTextStrokeColor: textOutlineStyle !== "none" ? el.outlineColor : undefined, display: "flex", alignItems: "center", justifyContent: el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start", borderRadius: 4, padding: "2px 4px" };
     if (el.hyperlink) return <a href={el.hyperlink} target="_blank" rel="noopener noreferrer" className={getAnimClass()} style={style}>{el.text}</a>;
     return <div className={getAnimClass()} style={style}>{el.text}</div>;
   }
@@ -6194,7 +6579,7 @@ function ElView({ el, zoom }) {
       const clipY = (h - imgH) / 2 + imgY;
       return (<div className={getAnimClass()} style={{ ...base, overflow: "hidden", position: "absolute", filter: blurStyle, boxShadow: shadowStyle, borderRadius: borderRadiusStyle }}><svg style={{ position: "absolute", top: 0, left: 0, width: w, height: h }}><defs><clipPath id={`clip-${el.id}`}>{el.shape === "rect" && <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} />}{el.shape === "circle" && <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} />}</clipPath></defs><image href={el.imageSrc} x={clipX} y={clipY} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${el.id})`} opacity={el.opacity / 100} />{el.shape === "rect" && <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} fill="none" stroke={el.stroke} strokeWidth={sw} />}{el.shape === "circle" && <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} fill="none" stroke={el.stroke} strokeWidth={sw} />}</svg></div>);
     }
-    return (<svg className={getAnimClass()} style={{ ...base, pointerEvents: "auto", cursor: "move", filter: blurStyle, boxShadow: shadowStyle }} viewBox={`0 0 ${w} ${h}`} overflow="visible">{el.shape === "rect" && <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} fill={el.fill === "transparent" ? "none" : el.fill} stroke={el.stroke} strokeWidth={sw} />}{el.shape === "circle" && <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} fill={el.fill === "transparent" ? "none" : el.fill} stroke={el.stroke} strokeWidth={sw} />}</svg>);
+    return (<svg className={getAnimClass()} style={{ ...base, pointerEvents: "auto", cursor: "move", filter: blurStyle, boxShadow: shadowStyle }} viewBox={`0 0 ${w} ${h}`} overflow="visible">{(el.shape === "rect" || el.shape === "image-rect") && <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} fill={el.fill === "transparent" ? "none" : el.fill} stroke={el.stroke} strokeWidth={sw} />}{(el.shape === "circle" || el.shape === "image-circle") && <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} fill={el.fill === "transparent" ? "none" : el.fill} stroke={el.stroke} strokeWidth={sw} />}</svg>);
   }
   return null;
 }
