@@ -1,4 +1,4 @@
-// CanvasEditor.jsx - Complete with Working Crop Feature + Image Adjustments + Perfect Circle Shape + Enhanced Text Shadow with Color + Full Color Picker + ALIGNMENT FEATURE (Without old align buttons) + LIST FEATURE
+// CanvasEditor.jsx - Complete Fixed (Mobile Pinch Zoom Working)
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { toast, Toaster } from 'react-hot-toast';
@@ -107,9 +107,6 @@ export default function CanvasEditor() {
   const [rotationStart, setRotationStart] = useState({ angle: 0, startAngle: 0 });
   const [isRemovingBg, setIsRemovingBg] = useState(false);
   const [bgGradient, setBgGradient] = useState(null);
-  const [tempGradientColors, setTempGradientColors] = useState(["#FF6B6B", "#4ECDC4"]);
-  const [tempGradientType, setTempGradientType] = useState("linear");
-  const [showGradientOption, setShowGradientOption] = useState(false);
   
   // Crop related state
   const [isCropping, setIsCropping] = useState(false);
@@ -143,26 +140,28 @@ export default function CanvasEditor() {
   const [bulletStyle, setBulletStyle] = useState("•");
   const [numberStyle, setNumberStyle] = useState("1.");
 
-  useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < 768);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
+  // Text Background Popup State
+  const [textBgType, setTextBgType] = useState("none");
+  const [textBgColor1, setTextBgColor1] = useState("#FF6B6B");
+  const [textBgColor2, setTextBgColor2] = useState("#4ECDC4");
+  const [textBgOpacity, setTextBgOpacity] = useState(100);
+  const [textBgRoundness, setTextBgRoundness] = useState(0);
 
-  useEffect(() => {
-    if (editingTextId && textInputRef.current) {
-      textInputRef.current.focus();
-      const length = editingTextValue.length;
-      textInputRef.current.setSelectionRange(length, length);
-    }
-  }, [editingTextId]);
+  // Hyperlink temp state
+  const [tempUrl, setTempUrl] = useState("");
+
+  // Opacity temp state
+  const [tempOpacity, setTempOpacity] = useState(100);
+
+  // Animation temp state
+  const [animSpeed, setAnimSpeed] = useState("medium");
 
   const [panel, setPanel] = useState(null);
   const [elements, setElements] = useState([]);
   const [selId, setSelId] = useState(null);
   const [bgColor, setBgColor] = useState("#ffffff");
   const [bgImage, setBgImage] = useState(null);
-  const [bgOpacity, setBgOpacity] = useState(100);
+  const [bgOpacityCanvas, setBgOpacityCanvas] = useState(100);
   const [filterPreset, setFilterPreset] = useState("");
   const [brightness, setBrightness] = useState(100);
   const [contrast, setContrast] = useState(100);
@@ -206,6 +205,23 @@ export default function CanvasEditor() {
   const uploadBgRef = useRef(null);
   const uploadImgRef = useRef(null);
 
+  // Pinch to zoom state
+  const pinchRef = useRef({ initialDistance: 0, initialZoom: 1 });
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
+    if (editingTextId && textInputRef.current) {
+      textInputRef.current.focus();
+      const length = editingTextValue.length;
+      textInputRef.current.setSelectionRange(length, length);
+    }
+  }, [editingTextId]);
+
   // Helper function to update text shadow
   const updateTextShadow = (opacity, angle, blur, color, distance) => {
     const rad = (angle * Math.PI) / 180;
@@ -217,6 +233,38 @@ export default function CanvasEditor() {
     const b = parseInt(color.slice(5,7), 16);
     const shadowString = `${x}px ${y}px ${blur}px rgba(${r}, ${g}, ${b}, ${opacityNum})`;
     commitSel({ textShadow: shadowString });
+  };
+
+  // Pinch to zoom handlers for mobile
+  const getTouchDistance = (touches) => {
+    return Math.hypot(
+      touches[0].clientX - touches[1].clientX,
+      touches[0].clientY - touches[1].clientY
+    );
+  };
+
+  const handleTouchStart = (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const distance = getTouchDistance(e.touches);
+      pinchRef.current.initialDistance = distance;
+      pinchRef.current.initialZoom = canvasZoom;
+    }
+  };
+
+  const handleTouchMove = (e) => {
+    if (e.touches.length === 2 && pinchRef.current.initialDistance > 0) {
+      e.preventDefault();
+      const distance = getTouchDistance(e.touches);
+      const scale = distance / pinchRef.current.initialDistance;
+      let newZoom = pinchRef.current.initialZoom * scale;
+      newZoom = Math.max(0.2, Math.min(2, newZoom));
+      setCanvasZoom(newZoom);
+    }
+  };
+
+  const handleTouchEnd = () => {
+    pinchRef.current.initialDistance = 0;
   };
 
   // Start crop
@@ -648,8 +696,79 @@ export default function CanvasEditor() {
     init();
   }, [loadFlexBook, createElementsFromData]);
 
+  // IMPORTANT: selEl ko define karo pehle
   const selEl = elements.find(e => e.id === selId) || null;
   const commitSel = (props) => commitElements(elements.map(e => e.id === selId ? { ...e, ...props } : e));
+
+  // Apply text background function - selEl available hai ab
+  const applyTextBackground = useCallback((type, color1, color2, opacity, roundness) => {
+    if (!selEl || selEl.type !== "text") return;
+    
+    let bgValue = "transparent";
+    if (type === "solid") {
+      bgValue = color1;
+    } else if (type === "linear") {
+      bgValue = `linear-gradient(135deg, ${color1}, ${color2})`;
+    } else if (type === "radial") {
+      bgValue = `radial-gradient(circle, ${color1}, ${color2})`;
+    } else {
+      bgValue = "transparent";
+    }
+    
+    commitSel({ 
+      textBackground: bgValue,
+      textBackgroundType: type,
+      textBgColor1: color1,
+      textBgColor2: color2,
+      textBgOpacity: opacity,
+      textBgRoundness: roundness
+    });
+  }, [selEl, commitSel]);
+
+  // Load text background values when popup opens
+  useEffect(() => {
+    if (activeFeature === "background" && selEl && selEl.type === "text") {
+      const existingBg = selEl.textBackground || "transparent";
+      let detectedType = "none";
+      
+      if (existingBg !== "transparent") {
+        if (existingBg.includes("linear-gradient")) {
+          detectedType = "linear";
+        } else if (existingBg.includes("radial-gradient")) {
+          detectedType = "radial";
+        } else {
+          detectedType = "solid";
+        }
+      }
+      
+      setTextBgType(detectedType);
+      setTextBgColor1(selEl.textBgColor1 || "#FF6B6B");
+      setTextBgColor2(selEl.textBgColor2 || "#4ECDC4");
+      setTextBgOpacity(selEl.textBgOpacity || 100);
+      setTextBgRoundness(selEl.textBgRoundness || 0);
+    }
+  }, [activeFeature, selEl]);
+
+  // Load hyperlink value when popup opens
+  useEffect(() => {
+    if (activeFeature === "hyperlink" && selEl) {
+      setTempUrl(selEl.hyperlink || "");
+    }
+  }, [activeFeature, selEl]);
+
+  // Load opacity value when popup opens
+  useEffect(() => {
+    if (activeFeature === "opacity" && selEl && (selEl.type === "text" || selEl.type === "shape" || selEl.type === "image")) {
+      setTempOpacity(selEl.opacity || 100);
+    }
+  }, [activeFeature, selEl]);
+
+  // Load animation values when popup opens
+  useEffect(() => {
+    if (activeFeature === "animation" && selEl) {
+      setAnimSpeed(selEl.animationSpeed || "medium");
+    }
+  }, [activeFeature, selEl]);
 
   const removeBackgroundFromCanvas = async () => {
     setIsRemovingBg(true);
@@ -1079,7 +1198,7 @@ export default function CanvasEditor() {
     ctx.fillStyle = getBgStyle();
     ctx.fillRect(0, 0, canvasSize.w, canvasSize.h);
     const loadImg = src => new Promise(res => { const i = new Image(); i.crossOrigin = "anonymous"; i.onload = () => res(i); i.onerror = () => res(null); i.src = src; });
-    if (bgImage) { const img = await loadImg(bgImage); if (img) { ctx.save(); ctx.globalAlpha = bgOpacity/100; ctx.drawImage(img,0,0,canvasSize.w,canvasSize.h); ctx.restore(); } }
+    if (bgImage) { const img = await loadImg(bgImage); if (img) { ctx.save(); ctx.globalAlpha = bgOpacityCanvas/100; ctx.drawImage(img,0,0,canvasSize.w,canvasSize.h); ctx.restore(); } }
     for (const el of elements) {
       ctx.save();
       ctx.globalAlpha = (el.opacity??100)/100;
@@ -1148,7 +1267,7 @@ export default function CanvasEditor() {
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = getBgStyle(); ctx.fillRect(0,0,canvasSize.w,canvasSize.h);
     const loadImg = src => new Promise(res => { const img = new Image(); img.crossOrigin="anonymous"; img.onload=()=>res(img); img.onerror=()=>res(null); img.src=src; });
-    if (bgImage) { const img=await loadImg(bgImage); if(img){ctx.save();ctx.globalAlpha=bgOpacity/100;ctx.drawImage(img,0,0,canvasSize.w,canvasSize.h);ctx.restore();} }
+    if (bgImage) { const img=await loadImg(bgImage); if(img){ctx.save();ctx.globalAlpha=bgOpacityCanvas/100;ctx.drawImage(img,0,0,canvasSize.w,canvasSize.h);ctx.restore();} }
     for (const el of elements) {
       ctx.save(); ctx.globalAlpha=(el.opacity??100)/100;
       if(el.type==="image"){const img=await loadImg(el.src);if(img)ctx.drawImage(img,el.x,el.y,el.w,el.h);}
@@ -1270,13 +1389,10 @@ export default function CanvasEditor() {
           { id: "position", icon: <FiMove />, label: "Position", action: () => setActiveFeature(activeFeature === "position" ? null : "position"), active: activeFeature === "position" },
           { id: "changeLang", icon: <FiGlobe />, label: "Lang", action: () => setActiveFeature(activeFeature === "changeLang" ? null : "changeLang"), active: activeFeature === "changeLang" },
           { id: "letterSpace", icon: <FiMove />, label: "Spacing", action: () => setActiveFeature(activeFeature === "letterSpacing" ? null : "letterSpacing"), active: activeFeature === "letterSpacing" },
-          { id: "bgColor", icon: <FiImage />, label: "TextBG", action: () => setActiveFeature(activeFeature === "background" ? null : "background"), active: activeFeature === "background" },
+          { id: "bgColor", icon: <FiImage />, label: "TextBG", action: () => { setActiveFeature(activeFeature === "background" ? null : "background"); }, active: activeFeature === "background" },
           { id: "animate", icon: <FiPlay />, label: "Animate", action: () => setActiveFeature(activeFeature === "animation" ? null : "animation"), active: activeFeature === "animation" },
           { id: "opacity", icon: <MdOpacity />, label: "Opacity", action: () => setActiveFeature(activeFeature === "opacity" ? null : "opacity"), active: activeFeature === "opacity" },
           { id: "link", icon: <FiLink />, label: "Link", action: () => setActiveFeature(activeFeature === "hyperlink" ? null : "hyperlink"), active: activeFeature === "hyperlink" },
-          { id: "rotate", icon: <FiRotateCw />, label: "Rotate", action: () => setActiveFeature(activeFeature === "rotate" ? null : "rotate"), active: activeFeature === "rotate" },
-          { id: "layerUp", icon: <FiArrowUp />, label: "Up", action: layerUp },
-          { id: "layerDown", icon: <FiArrowDown />, label: "Down", action: layerDown },
           { id: "duplicate", icon: <FiCopy />, label: "Copy", action: duplicateEl },
           { id: "copyStyle", icon: <FiCopy />, label: "Style", action: copyStyle },
           { id: "pasteStyle", icon: <FiCopy />, label: "Paste", action: pasteStyle },
@@ -1471,10 +1587,16 @@ export default function CanvasEditor() {
   };
 
   const CanvasArea = () => (
-    <div ref={canvasAreaRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp}
-      onTouchStart={onPointerDown} onTouchMove={onPointerMove} onTouchEnd={onPointerUp}
+    <div 
+      ref={canvasAreaRef} 
+      onPointerDown={onPointerDown} 
+      onPointerMove={onPointerMove} 
+      onPointerUp={onPointerUp}
+      onTouchStart={(e) => { onPointerDown(e); handleTouchStart(e); }} 
+      onTouchMove={(e) => { onPointerMove(e); handleTouchMove(e); }} 
+      onTouchEnd={(e) => { onPointerUp(e); handleTouchEnd(); }}
       style={{ position: "relative", width: canvasSize.w * canvasZoom, height: canvasSize.h * canvasZoom, cursor: "default", userSelect: "none", touchAction: "none", boxShadow: "0 4px 32px rgba(0,0,0,0.2)", borderRadius: 4, overflow: "hidden", background: getBgStyle(), margin: "auto" }}>
-      {bgImage && <img src={bgImage} alt="bg" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: bgOpacity / 100, filter: bgFilter, pointerEvents: "none" }} />}
+      {bgImage && <img src={bgImage} alt="bg" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", opacity: bgOpacityCanvas / 100, filter: bgFilter, pointerEvents: "none" }} />}
       <GuidesOverlay />
       {elements.map(el => {
         if (el.type === "text" && editingTextId === el.id) {
@@ -1506,12 +1628,100 @@ export default function CanvasEditor() {
       </div>
     );
 
-    // LIST POPUP - Bullets aur Numbers
+    // OPACITY POPUP
+    if (activeFeature === "opacity" && selEl && (selEl.type === "text" || selEl.type === "shape" || selEl.type === "image")) {
+      return (
+        <div style={popupStyle}>
+          <Header title="Opacity" />
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 8, textAlign: "center" }}>Opacity</div>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 16 }}>
+              <button onClick={() => { const newVal = Math.max(0, tempOpacity - 10); setTempOpacity(newVal); commitSel({ opacity: newVal }); }} style={{ width: 44, height: 44, borderRadius: 10, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>-</button>
+              <span style={{ fontSize: 32, fontWeight: 700, color: ACCENT, minWidth: 80, textAlign: "center" }}>{tempOpacity}%</span>
+              <button onClick={() => { const newVal = Math.min(100, tempOpacity + 10); setTempOpacity(newVal); commitSel({ opacity: newVal }); }} style={{ width: 44, height: 44, borderRadius: 10, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 24, display: "flex", alignItems: "center", justifyContent: "center" }}>+</button>
+            </div>
+            <input type="range" min={0} max={100} value={tempOpacity} onChange={(e) => { const newVal = parseInt(e.target.value); setTempOpacity(newVal); commitSel({ opacity: newVal }); }} style={{ width: "100%" }} />
+          </div>
+        </div>
+      );
+    }
+
+    // TEXT BACKGROUND POPUP
+    if (activeFeature === "background" && selEl && selEl.type === "text") {
+      return (
+        <div style={popupStyle}>
+          <Header title="Background" />
+          <div style={{ display: "flex", gap: 8, marginBottom: 20, borderBottom: "1px solid #e5e7eb", paddingBottom: 12 }}>
+            <button onClick={() => { setTextBgType("none"); applyTextBackground("none", textBgColor1, textBgColor2, textBgOpacity, textBgRoundness); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: textBgType === "none" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 12, color: textBgType === "none" ? "#fff" : "#555" }}>None</button>
+            <button onClick={() => { setTextBgType("solid"); applyTextBackground("solid", textBgColor1, textBgColor2, textBgOpacity, textBgRoundness); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: textBgType === "solid" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 12, color: textBgType === "solid" ? "#fff" : "#555" }}>Solid</button>
+            <button onClick={() => { setTextBgType("linear"); applyTextBackground("linear", textBgColor1, textBgColor2, textBgOpacity, textBgRoundness); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: textBgType === "linear" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 12, color: textBgType === "linear" ? "#fff" : "#555" }}>Linear</button>
+            <button onClick={() => { setTextBgType("radial"); applyTextBackground("radial", textBgColor1, textBgColor2, textBgOpacity, textBgRoundness); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: textBgType === "radial" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 12, color: textBgType === "radial" ? "#fff" : "#555" }}>Radial</button>
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Color 1</div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+              <input type="color" value={textBgColor1} onChange={(e) => { setTextBgColor1(e.target.value); applyTextBackground(textBgType, e.target.value, textBgColor2, textBgOpacity, textBgRoundness); }} style={{ width: 50, height: 40, borderRadius: 8, cursor: "pointer", border: "1px solid #e5e7eb" }} />
+              <div style={{ display: "flex", gap: 6, flex: 1, flexWrap: "wrap" }}>
+                {COLOR_PRESETS.map(c => (<div key={c} onClick={() => { setTextBgColor1(c); applyTextBackground(textBgType, c, textBgColor2, textBgOpacity, textBgRoundness); }} style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: "pointer", border: textBgColor1 === c ? `2px solid ${ACCENT}` : "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />))}
+              </div>
+            </div>
+          </div>
+          {(textBgType === "linear" || textBgType === "radial") && (
+            <div style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 12, color: "#888", marginBottom: 6 }}>Color 2</div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                <input type="color" value={textBgColor2} onChange={(e) => { setTextBgColor2(e.target.value); applyTextBackground(textBgType, textBgColor1, e.target.value, textBgOpacity, textBgRoundness); }} style={{ width: 50, height: 40, borderRadius: 8, cursor: "pointer", border: "1px solid #e5e7eb" }} />
+                <div style={{ display: "flex", gap: 6, flex: 1, flexWrap: "wrap" }}>
+                  {COLOR_PRESETS.map(c => (<div key={c} onClick={() => { setTextBgColor2(c); applyTextBackground(textBgType, textBgColor1, c, textBgOpacity, textBgRoundness); }} style={{ width: 28, height: 28, borderRadius: 6, background: c, cursor: "pointer", border: textBgColor2 === c ? `2px solid ${ACCENT}` : "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />))}
+                </div>
+              </div>
+            </div>
+          )}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: "#888" }}>Opacity</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button onClick={() => { const newVal = Math.max(0, textBgOpacity - 10); setTextBgOpacity(newVal); applyTextBackground(textBgType, textBgColor1, textBgColor2, newVal, textBgRoundness); }} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 18 }}>-</button>
+                <span style={{ fontSize: 14, fontWeight: 600, minWidth: 40, textAlign: "center" }}>{textBgOpacity}%</span>
+                <button onClick={() => { const newVal = Math.min(100, textBgOpacity + 10); setTextBgOpacity(newVal); applyTextBackground(textBgType, textBgColor1, textBgColor2, newVal, textBgRoundness); }} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 18 }}>+</button>
+              </div>
+            </div>
+            <input type="range" min={0} max={100} value={textBgOpacity} onChange={(e) => { const newVal = parseInt(e.target.value); setTextBgOpacity(newVal); applyTextBackground(textBgType, textBgColor1, textBgColor2, newVal, textBgRoundness); }} style={{ width: "100%" }} />
+          </div>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+              <span style={{ fontSize: 12, color: "#888" }}>Roundness</span>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button onClick={() => { const newVal = Math.max(0, textBgRoundness - 5); setTextBgRoundness(newVal); applyTextBackground(textBgType, textBgColor1, textBgColor2, textBgOpacity, newVal); }} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 18 }}>-</button>
+                <span style={{ fontSize: 14, fontWeight: 600, minWidth: 40, textAlign: "center" }}>{textBgRoundness}px</span>
+                <button onClick={() => { const newVal = Math.min(50, textBgRoundness + 5); setTextBgRoundness(newVal); applyTextBackground(textBgType, textBgColor1, textBgColor2, textBgOpacity, newVal); }} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 700, fontSize: 18 }}>+</button>
+              </div>
+            </div>
+            <input type="range" min={0} max={50} value={textBgRoundness} onChange={(e) => { const newVal = parseInt(e.target.value); setTextBgRoundness(newVal); applyTextBackground(textBgType, textBgColor1, textBgColor2, textBgOpacity, newVal); }} style={{ width: "100%" }} />
+          </div>
+        </div>
+      );
+    }
+
+    // HYPERLINK POPUP
+    if (activeFeature === "hyperlink" && selEl) {
+      return (
+        <div style={popupStyle}>
+          <Header title="Hyperlink" />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>Add a URL</div>
+            <input type="url" placeholder="https://example.com" value={tempUrl} onChange={(e) => setTempUrl(e.target.value)} style={{ width: "100%", padding: "10px 12px", borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 14, boxSizing: "border-box" }} />
+          </div>
+          <button onClick={() => { if (tempUrl && tempUrl.trim() !== "") { let finalUrl = tempUrl; if (!finalUrl.startsWith('http://') && !finalUrl.startsWith('https://')) { finalUrl = 'https://' + finalUrl; } commitSel({ hyperlink: finalUrl }); toast.success("Link applied!"); } else { commitSel({ hyperlink: null }); toast.success("Link removed!"); } setActiveFeature(null); }} style={{ width: "100%", padding: 12, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Apply</button>
+        </div>
+      );
+    }
+
+    // LIST POPUP
     if (activeFeature === "list" && selEl && selEl.type === "text") {
       const applyList = () => {
         const text = selEl.text;
         const lines = text.split('\n');
-        
         if (listType === "bullets") {
           const bulletLines = lines.map(line => `${bulletStyle} ${line}`).join('\n');
           commitSel({ text: bulletLines });
@@ -1531,22 +1741,13 @@ export default function CanvasEditor() {
         }
         setActiveFeature(null);
       };
-      
       return (
         <div style={popupStyle}>
           <Header title="List" />
-          
-          {/* List Type Selection */}
           <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-            <button onClick={() => setListType("bullets")} style={{ flex: 1, padding: 10, borderRadius: 8, background: listType === "bullets" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", color: listType === "bullets" ? "#fff" : "#333", fontWeight: 600 }}>
-              Bullets
-            </button>
-            <button onClick={() => setListType("numbers")} style={{ flex: 1, padding: 10, borderRadius: 8, background: listType === "numbers" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", color: listType === "numbers" ? "#fff" : "#333", fontWeight: 600 }}>
-              Numbers
-            </button>
+            <button onClick={() => setListType("bullets")} style={{ flex: 1, padding: 10, borderRadius: 8, background: listType === "bullets" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", color: listType === "bullets" ? "#fff" : "#333", fontWeight: 600 }}>Bullets</button>
+            <button onClick={() => setListType("numbers")} style={{ flex: 1, padding: 10, borderRadius: 8, background: listType === "numbers" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", color: listType === "numbers" ? "#fff" : "#333", fontWeight: 600 }}>Numbers</button>
           </div>
-          
-          {/* Bullet Styles */}
           {listType === "bullets" && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Bullet Style</div>
@@ -1559,8 +1760,6 @@ export default function CanvasEditor() {
               </div>
             </div>
           )}
-          
-          {/* Number Styles */}
           {listType === "numbers" && (
             <div style={{ marginBottom: 16 }}>
               <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Number Style</div>
@@ -1571,216 +1770,94 @@ export default function CanvasEditor() {
               </div>
             </div>
           )}
-          
-          {/* Apply Button */}
-          <button onClick={applyList} style={{ width: "100%", padding: 12, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, marginTop: 8 }}>
-            Apply {listType === "bullets" ? "Bullets" : "Numbers"}
-          </button>
-          
-          {/* Remove List Button */}
-          <button onClick={() => { 
-            const text = selEl.text;
-            const cleanText = text.replace(/^[•○▪▫➤]\s+|^\d+\.\s+|^[a-z]\.\s+|^[ivx]+\.\s+/gm, '');
-            commitSel({ text: cleanText });
-            toast.success("List removed!");
-            setActiveFeature(null);
-          }} style={{ width: "100%", marginTop: 10, padding: 10, background: "#fee2e2", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, color: "#dc2626" }}>
-            Remove List
-          </button>
+          <button onClick={applyList} style={{ width: "100%", padding: 12, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, marginTop: 8 }}>Apply {listType === "bullets" ? "Bullets" : "Numbers"}</button>
+          <button onClick={() => { const text = selEl.text; const cleanText = text.replace(/^[•○▪▫➤]\s+|^\d+\.\s+|^[a-z]\.\s+|^[ivx]+\.\s+/gm, ''); commitSel({ text: cleanText }); toast.success("List removed!"); setActiveFeature(null); }} style={{ width: "100%", marginTop: 10, padding: 10, background: "#fee2e2", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600, color: "#dc2626" }}>Remove List</button>
         </div>
       );
     }
 
-    // ALIGNMENT POPUP - Horizontal aur Vertical (New)
+    // ALIGNMENT POPUP
     if (activeFeature === "alignment" && selEl) {
       return (
         <div style={popupStyle}>
           <Header title="Alignment" />
-          
-          {/* Horizontal Alignment */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>Horizontal</div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { commitSel({ x: 0 }); setActiveFeature(null); toast.success("Aligned Left"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <FiAlignLeft size={14} /> Left
-              </button>
-              <button onClick={() => { commitSel({ x: (canvasSize.w - (selEl.w || 100)) / 2 }); setActiveFeature(null); toast.success("Aligned Center"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <FiAlignCenter size={14} /> Center
-              </button>
-              <button onClick={() => { commitSel({ x: canvasSize.w - (selEl.w || 100) }); setActiveFeature(null); toast.success("Aligned Right"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <FiAlignRight size={14} /> Right
-              </button>
+              <button onClick={() => { commitSel({ x: 0 }); setActiveFeature(null); toast.success("Aligned Left"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><FiAlignLeft size={14} /> Left</button>
+              <button onClick={() => { commitSel({ x: (canvasSize.w - (selEl.w || 100)) / 2 }); setActiveFeature(null); toast.success("Aligned Center"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><FiAlignCenter size={14} /> Center</button>
+              <button onClick={() => { commitSel({ x: canvasSize.w - (selEl.w || 100) }); setActiveFeature(null); toast.success("Aligned Right"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><FiAlignRight size={14} /> Right</button>
             </div>
           </div>
-          
-          {/* Vertical Alignment */}
           <div>
             <div style={{ fontSize: 12, color: "#666", marginBottom: 8 }}>Vertical</div>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => { commitSel({ y: 0 }); setActiveFeature(null); toast.success("Aligned Top"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <FiArrowUp size={14} /> Top
-              </button>
-              <button onClick={() => { commitSel({ y: (canvasSize.h - (selEl.h || 60)) / 2 }); setActiveFeature(null); toast.success("Aligned Middle"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <FiMove size={14} /> Middle
-              </button>
-              <button onClick={() => { commitSel({ y: canvasSize.h - (selEl.h || 60) }); setActiveFeature(null); toast.success("Aligned Bottom"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
-                <FiArrowDown size={14} /> Bottom
-              </button>
+              <button onClick={() => { commitSel({ y: 0 }); setActiveFeature(null); toast.success("Aligned Top"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><FiArrowUp size={14} /> Top</button>
+              <button onClick={() => { commitSel({ y: (canvasSize.h - (selEl.h || 60)) / 2 }); setActiveFeature(null); toast.success("Aligned Middle"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><FiMove size={14} /> Middle</button>
+              <button onClick={() => { commitSel({ y: canvasSize.h - (selEl.h || 60) }); setActiveFeature(null); toast.success("Aligned Bottom"); }} style={{ flex: 1, padding: 10, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><FiArrowDown size={14} /> Bottom</button>
             </div>
           </div>
         </div>
       );
     }
 
-    // SHADOW POPUP - 2 LEVELS (Default simple + Custom detailed)
+    // ANIMATION POPUP
+    if (activeFeature === "animation" && selEl) {
+      const animations = ["none", "bounce", "fade", "jello", "slideUp", "pulse", "shake", "zoomIn"];
+      const applyAnimation = (anim) => {
+        let duration = "0.5s";
+        if (animSpeed === "slow") duration = "1s";
+        if (animSpeed === "fast") duration = "0.3s";
+        commitSel({ animation: anim, animationSpeed: animSpeed, animationDuration: duration });
+        setActiveFeature(null);
+      };
+      return (
+        <div style={popupStyle}>
+          <Header title="Entrance Animation" />
+          <div style={{ marginBottom: 20 }}>
+            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Speed</div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => { setAnimSpeed("slow"); if (selEl.animation && selEl.animation !== "none") commitSel({ animationSpeed: "slow", animationDuration: "1s" }); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: animSpeed === "slow" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, color: animSpeed === "slow" ? "#fff" : "#555" }}>Slow</button>
+              <button onClick={() => { setAnimSpeed("medium"); if (selEl.animation && selEl.animation !== "none") commitSel({ animationSpeed: "medium", animationDuration: "0.5s" }); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: animSpeed === "medium" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, color: animSpeed === "medium" ? "#fff" : "#555" }}>Medium</button>
+              <button onClick={() => { setAnimSpeed("fast"); if (selEl.animation && selEl.animation !== "none") commitSel({ animationSpeed: "fast", animationDuration: "0.3s" }); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, background: animSpeed === "fast" ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, color: animSpeed === "fast" ? "#fff" : "#555" }}>Fast</button>
+            </div>
+          </div>
+          <div style={{ borderTop: "1px solid #e5e7eb", marginBottom: 16 }} />
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 10 }}>
+            {animations.map(anim => (
+              <button key={anim} onClick={() => applyAnimation(anim)} style={{ padding: "10px 0", borderRadius: 8, background: selEl.animation === anim ? ACCENT : "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13, color: selEl.animation === anim ? "#fff" : "#333", textTransform: "capitalize" }}>
+                {anim === "none" ? "None" : anim === "slideUp" ? "Slide Up" : anim === "zoomIn" ? "Zoom In" : anim.charAt(0).toUpperCase() + anim.slice(1)}
+              </button>
+            ))}
+          </div>
+        </div>
+      );
+    }
+
+    // SHADOW POPUP
     if (activeFeature === "shadow" && selEl && selEl.type === "text") {
-      
-      // If Custom mode is active, show detailed sliders
       if (isShadowCustomMode) {
-        const currentShadow = selEl.textShadow && selEl.textShadow !== "none" ? selEl.textShadow : null;
-        let currentOpacity = shadowOpacity, currentAngle = shadowAngle, currentBlur = shadowBlur, currentDistance = shadowDistance;
-        let currentColor = shadowColor;
-        
-        if (currentShadow) {
-          const match = currentShadow.match(/([-\d.]+)px\s+([-\d.]+)px\s+(\d+)px\s+rgba?\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
-          if (match) {
-            const x = parseFloat(match[1]);
-            const y = parseFloat(match[2]);
-            currentDistance = Math.sqrt(x*x + y*y);
-            currentAngle = Math.atan2(y, x) * 180 / Math.PI;
-            if (currentAngle < 0) currentAngle += 360;
-            currentBlur = parseInt(match[3]);
-            const r = parseInt(match[4]), g = parseInt(match[5]), b = parseInt(match[6]);
-            currentColor = `#${((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1)}`;
-            currentOpacity = Math.round(parseFloat(match[7]) * 100);
-          }
-        }
-        
-        const applyDetailedShadow = () => {
-          const rad = (currentAngle * Math.PI) / 180;
-          const x = Math.cos(rad) * currentDistance;
-          const y = Math.sin(rad) * currentDistance;
-          const opacityNum = currentOpacity / 100;
-          const r = parseInt(currentColor.slice(1,3), 16);
-          const g = parseInt(currentColor.slice(3,5), 16);
-          const b = parseInt(currentColor.slice(5,7), 16);
-          const shadowString = `${x}px ${y}px ${currentBlur}px rgba(${r}, ${g}, ${b}, ${opacityNum})`;
-          commitSel({ textShadow: shadowString });
-        };
-        
         return (
           <div style={popupStyle}>
             <Header title="Shadow" />
-            <button onClick={() => setIsShadowCustomMode(false)} style={{ marginBottom: 12, padding: "4px 8px", background: "#f3f4f6", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11, display: "flex", alignItems: "center", gap: 4 }}><FiArrowLeft size={12} /> Back to Simple</button>
-            
+            <button onClick={() => setIsShadowCustomMode(false)} style={{ marginBottom: 12, padding: "4px 8px", background: "#f3f4f6", border: "none", borderRadius: 6, cursor: "pointer", fontSize: 11 }}><FiArrowLeft size={12} /> Back</button>
             <div style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ fontSize: 12, color: "#666" }}>Opacity</span><span style={{ fontSize: 12, fontWeight: 600 }}>{currentOpacity}%</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input type="range" min={0} max={100} value={currentOpacity} onChange={(e) => { setShadowOpacity(parseInt(e.target.value)); currentOpacity = parseInt(e.target.value); applyDetailedShadow(); }} style={{ flex: 1 }} />
-                <button onClick={() => { setShadowOpacity(prev => Math.min(100, prev + 5)); currentOpacity = Math.min(100, currentOpacity + 5); applyDetailedShadow(); }} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600 }}>+</button>
-              </div>
+              <div><span>Opacity</span><span>{shadowOpacity}%</span></div>
+              <input type="range" min={0} max={100} value={shadowOpacity} onChange={(e) => { setShadowOpacity(+e.target.value); updateTextShadow(shadowOpacity, shadowAngle, shadowBlur, shadowColor, shadowDistance); }} />
             </div>
-            
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ fontSize: 12, color: "#666" }}>Angle</span><span style={{ fontSize: 12, fontWeight: 600 }}>{currentAngle}°</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input type="range" min={0} max={360} value={currentAngle} onChange={(e) => { setShadowAngle(parseInt(e.target.value)); currentAngle = parseInt(e.target.value); applyDetailedShadow(); }} style={{ flex: 1 }} />
-                <button onClick={() => { setShadowAngle(prev => (prev + 15) % 360); currentAngle = (currentAngle + 15) % 360; applyDetailedShadow(); }} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600 }}>+</button>
-              </div>
-            </div>
-            
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ fontSize: 12, color: "#666" }}>Blur</span><span style={{ fontSize: 12, fontWeight: 600 }}>{currentBlur}px</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input type="range" min={0} max={30} value={currentBlur} onChange={(e) => { setShadowBlur(parseInt(e.target.value)); currentBlur = parseInt(e.target.value); applyDetailedShadow(); }} style={{ flex: 1 }} />
-                <button onClick={() => { setShadowBlur(prev => Math.min(30, prev + 1)); currentBlur = Math.min(30, currentBlur + 1); applyDetailedShadow(); }} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600 }}>+</button>
-              </div>
-            </div>
-            
-            <div style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 12, marginBottom: 6 }}>Color</div>
-              <input type="color" value={currentColor} onChange={(e) => { setShadowColor(e.target.value); currentColor = e.target.value; applyDetailedShadow(); }} style={{ width: "100%", height: 40, borderRadius: 8, cursor: "pointer" }} />
-            </div>
-            
-            <div style={{ marginBottom: 16 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}><span style={{ fontSize: 12, color: "#666" }}>Distance</span><span style={{ fontSize: 12, fontWeight: 600 }}>{currentDistance}px</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <input type="range" min={0} max={50} value={currentDistance} onChange={(e) => { setShadowDistance(parseInt(e.target.value)); currentDistance = parseInt(e.target.value); applyDetailedShadow(); }} style={{ flex: 1 }} />
-                <button onClick={() => { setShadowDistance(prev => Math.min(50, prev + 1)); currentDistance = Math.min(50, currentDistance + 1); applyDetailedShadow(); }} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600 }}>+</button>
-              </div>
-            </div>
-            
-            <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
-              <button onClick={() => { commitSel({ textShadow: "none" }); setShadowOpacity(0); }} style={{ flex: 1, padding: 8, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13 }}>None</button>
-              <button onClick={() => { const lightShadow = "2px 2px 4px rgba(0,0,0,0.15)"; commitSel({ textShadow: lightShadow }); setShadowOpacity(15); setShadowAngle(45); setShadowBlur(4); setShadowDistance(2.8); }} style={{ flex: 1, padding: 8, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13 }}>Light</button>
-              <button onClick={() => { const strongShadow = "4px 4px 8px rgba(0,0,0,0.5)"; commitSel({ textShadow: strongShadow }); setShadowOpacity(50); setShadowAngle(45); setShadowBlur(8); setShadowDistance(5.6); }} style={{ flex: 1, padding: 8, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13 }}>Strong</button>
-              <button onClick={() => { setIsShadowCustomMode(true); }} style={{ flex: 1, padding: 8, borderRadius: 8, background: ACCENT, border: "none", cursor: "pointer", fontSize: 13, color: "#fff" }}>Custom</button>
-            </div>
-            
-            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "center", borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-              {["Aa", "Aa", "Aa", "Aa", "Aa", "Aa", "Aa", "Aa"].map((text, idx) => (
-                <div key={idx} style={{ width: 36, height: 36, borderRadius: 8, background: `linear-gradient(135deg, ${COLOR_PRESETS[idx % COLOR_PRESETS.length]}, ${COLOR_PRESETS[(idx+3) % COLOR_PRESETS.length]})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 600, color: "#fff", cursor: "pointer" }} onClick={() => toast.info("Gradient text effect applied!")}>Aa</div>
-              ))}
-            </div>
+            <div><div>Color</div><input type="color" value={shadowColor} onChange={(e) => { setShadowColor(e.target.value); updateTextShadow(shadowOpacity, shadowAngle, shadowBlur, e.target.value, shadowDistance); }} /></div>
+            <button onClick={() => { setShadowOpacity(0); setShadowDistance(0); updateTextShadow(0, shadowAngle, shadowBlur, shadowColor, 0); }}>None</button>
           </div>
         );
       }
-      
-      // Default Simple Shadow Popup
-      const currentDistanceFromShadow = () => {
-        const shadow = selEl.textShadow && selEl.textShadow !== "none" ? selEl.textShadow : null;
-        if (shadow) {
-          const match = shadow.match(/([-\d.]+)px\s+([-\d.]+)px/);
-          if (match) {
-            const x = parseFloat(match[1]);
-            const y = parseFloat(match[2]);
-            return Math.sqrt(x*x + y*y).toFixed(0);
-          }
-        }
-        return 4;
-      };
-      
-      const handleDistanceChange = (val) => {
-        setShadowDistance(val);
-        const angle = shadowAngle;
-        const rad = (angle * Math.PI) / 180;
-        const x = Math.cos(rad) * val;
-        const y = Math.sin(rad) * val;
-        const opacityNum = shadowOpacity / 100;
-        const r = parseInt(shadowColor.slice(1,3), 16);
-        const g = parseInt(shadowColor.slice(3,5), 16);
-        const b = parseInt(shadowColor.slice(5,7), 16);
-        const shadowString = `${x}px ${y}px ${shadowBlur}px rgba(${r}, ${g}, ${b}, ${opacityNum})`;
-        commitSel({ textShadow: shadowString });
-      };
-      
       return (
         <div style={popupStyle}>
           <Header title="Shadow" />
-          
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontSize: 12, color: "#666" }}>Distance</span>
-              <span style={{ fontSize: 12, fontWeight: 600 }}>{currentDistanceFromShadow()}px</span>
-            </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              <input type="range" min={0} max={30} value={currentDistanceFromShadow()} onChange={(e) => handleDistanceChange(parseInt(e.target.value))} style={{ flex: 1 }} />
-              <button onClick={() => handleDistanceChange(Math.min(30, parseInt(currentDistanceFromShadow()) + 1))} style={{ width: 32, height: 32, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontWeight: 600 }}>+</button>
-            </div>
-          </div>
-          
-          <div style={{ display: "flex", gap: 10, marginBottom: 16, justifyContent: "space-between" }}>
-            <div onClick={() => { commitSel({ textShadow: "2px 2px 4px rgba(255,107,107,0.4)" }); setShadowOpacity(40); setShadowBlur(4); setShadowDistance(2.8); setShadowColor("#FF6B6B"); }} style={{ width: 70, height: 50, borderRadius: 10, background: "linear-gradient(135deg, #FF6B6B, #FF6B6B)", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>Aa</div>
-            <div onClick={() => { commitSel({ textShadow: "2px 2px 4px rgba(78,205,196,0.4)" }); setShadowOpacity(40); setShadowBlur(4); setShadowDistance(2.8); setShadowColor("#4ECDC4"); }} style={{ width: 70, height: 50, borderRadius: 10, background: "linear-gradient(135deg, #4ECDC4, #4ECDC4)", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>Aa</div>
-            <div onClick={() => { commitSel({ textShadow: "2px 2px 4px rgba(102,126,234,0.4)" }); setShadowOpacity(40); setShadowBlur(4); setShadowDistance(2.8); setShadowColor("#667eea"); }} style={{ width: 70, height: 50, borderRadius: 10, background: "linear-gradient(135deg, #667eea, #764ba2)", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>Aa</div>
-          </div>
-          
-          <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
-            <button onClick={() => { commitSel({ textShadow: "none" }); setIsShadowCustomMode(false); }} style={{ flex: 1, padding: 8, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13 }}>None</button>
-            <button onClick={() => { commitSel({ textShadow: "2px 2px 4px rgba(0,0,0,0.15)" }); setIsShadowCustomMode(false); }} style={{ flex: 1, padding: 8, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13 }}>Light</button>
-            <button onClick={() => { commitSel({ textShadow: "4px 4px 8px rgba(0,0,0,0.5)" }); setIsShadowCustomMode(false); }} style={{ flex: 1, padding: 8, borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13 }}>Strong</button>
-            <button onClick={() => { setIsShadowCustomMode(true); }} style={{ flex: 1, padding: 8, borderRadius: 8, background: ACCENT, border: "none", cursor: "pointer", fontSize: 13, color: "#fff" }}>Custom</button>
-          </div>
+          <div><div>Distance</div><input type="range" min={0} max={30} value={shadowDistance} onChange={(e) => { setShadowDistance(+e.target.value); updateTextShadow(shadowOpacity, shadowAngle, shadowBlur, shadowColor, +e.target.value); }} /></div>
+          <div><button onClick={() => { setShadowOpacity(0); updateTextShadow(0, shadowAngle, shadowBlur, shadowColor, 0); }}>None</button>
+          <button onClick={() => { setShadowOpacity(40); setShadowBlur(4); setShadowDistance(3); updateTextShadow(40, 45, 4, "#000000", 3); }}>Light</button>
+          <button onClick={() => { setShadowOpacity(70); setShadowBlur(8); setShadowDistance(6); updateTextShadow(70, 45, 8, "#000000", 6); }}>Strong</button>
+          <button onClick={() => setIsShadowCustomMode(true)}>Custom</button></div>
         </div>
       );
     }
@@ -1790,42 +1867,9 @@ export default function CanvasEditor() {
       return (
         <div style={popupStyle}>
           <Header title="Fill" />
-          
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Color 1</div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
-              <div onClick={() => commitSel({ color: "#FF6B6B", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#FF6B6B", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-              <div onClick={() => commitSel({ color: "#4ECDC4", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#4ECDC4", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-              <div onClick={() => commitSel({ color: "#45B7D1", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#45B7D1", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-              <div onClick={() => commitSel({ color: "#96CEB4", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#96CEB4", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-              <div onClick={() => commitSel({ color: "#FFEAA7", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#FFEAA7", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            </div>
-          </div>
-          
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, color: "#888", marginBottom: 8 }}>Color 2</div>
-            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
-              <div onClick={() => commitSel({ color: "#DDA0DD", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#DDA0DD", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-              <div onClick={() => commitSel({ color: "#FFB347", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#FFB347", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-              <div onClick={() => commitSel({ color: "#87CEEB", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#87CEEB", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-              <div onClick={() => commitSel({ color: "#FF69B4", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#FF69B4", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-              <div onClick={() => commitSel({ color: "#20B2AA", useGradient: false })} style={{ width: 44, height: 44, borderRadius: 10, background: "#20B2AA", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            </div>
-          </div>
-          
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ display: "flex", gap: 10, justifyContent: "space-between" }}>
-              <div onClick={() => commitSel({ useGradient: true, gradientColors: ["#FF6B6B", "#4ECDC4"], gradientType: "linear" })} style={{ width: 70, height: 50, borderRadius: 10, background: "linear-gradient(135deg, #FF6B6B, #4ECDC4)", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>Aa</div>
-              <div onClick={() => commitSel({ useGradient: true, gradientColors: ["#667eea", "#764ba2"], gradientType: "linear" })} style={{ width: 70, height: 50, borderRadius: 10, background: "linear-gradient(135deg, #667eea, #764ba2)", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>Aa</div>
-              <div onClick={() => commitSel({ useGradient: true, gradientColors: ["#f093fb", "#f5576c"], gradientType: "linear" })} style={{ width: 70, height: 50, borderRadius: 10, background: "linear-gradient(135deg, #f093fb, #f5576c)", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 14, fontWeight: 600, color: "#fff" }}>Aa</div>
-            </div>
-          </div>
-          
-          <div style={{ display: "flex", gap: 8, borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>
-            <button onClick={() => commitSel({ useGradient: false })} style={{ flex: 1, padding: 8, borderRadius: 6, background: selEl.useGradient === false ? ACCENT : "#f3f4f6", color: selEl.useGradient === false ? "#fff" : "#333", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Solid</button>
-            <button onClick={() => commitSel({ useGradient: true, gradientColors: ["#FF6B6B", "#4ECDC4"], gradientType: "linear" })} style={{ flex: 1, padding: 8, borderRadius: 6, background: (selEl.useGradient === true && selEl.gradientType === "linear") ? ACCENT : "#f3f4f6", color: (selEl.useGradient === true && selEl.gradientType === "linear") ? "#fff" : "#333", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Linear</button>
-            <button onClick={() => commitSel({ useGradient: true, gradientColors: ["#FF6B6B", "#4ECDC4"], gradientType: "radial" })} style={{ flex: 1, padding: 8, borderRadius: 6, background: (selEl.useGradient === true && selEl.gradientType === "radial") ? ACCENT : "#f3f4f6", color: (selEl.useGradient === true && selEl.gradientType === "radial") ? "#fff" : "#333", border: "none", cursor: "pointer", fontWeight: 600, fontSize: 13 }}>Radial</button>
-          </div>
+          <div><div>Color 1</div><div style={{ display: "flex", gap: 6 }}>{COLOR_PRESETS.slice(0,5).map(c => <div key={c} onClick={() => commitSel({ color: c, useGradient: false })} style={{ width: 40, height: 40, borderRadius: 8, background: c, cursor: "pointer" }} />)}</div></div>
+          <div><div>Color 2</div><div style={{ display: "flex", gap: 6 }}>{COLOR_PRESETS.slice(5).map(c => <div key={c} onClick={() => commitSel({ color: c, useGradient: false })} style={{ width: 40, height: 40, borderRadius: 8, background: c, cursor: "pointer" }} />)}</div></div>
+          <div><button onClick={() => commitSel({ useGradient: true, gradientColors: ["#FF6B6B", "#4ECDC4"], gradientType: "linear" })}>Linear</button><button onClick={() => commitSel({ useGradient: true, gradientColors: ["#FF6B6B", "#4ECDC4"], gradientType: "radial" })}>Radial</button></div>
         </div>
       );
     }
@@ -1835,36 +1879,26 @@ export default function CanvasEditor() {
       return (
         <div style={popupStyle}>
           <Header title="Position" />
-          
           <div style={{ display: "flex", gap: 12, marginBottom: 16 }}>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-              <button onClick={() => commitSel({ y: canvasSize.h - (selEl.h || 60) })} style={{ padding: "8px 12px", borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><FiArrowDown size={14} /> To Bottom</button>
-              <button onClick={() => commitSel({ y: 0 })} style={{ padding: "8px 12px", borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}><FiArrowUp size={14} /> To Top</button>
-            </div>
-            <div style={{ display: "flex", flexDirection: "column", gap: 6, flex: 1 }}>
-              <button onClick={layerDown} style={{ padding: "8px 12px", borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>Backward</button>
-              <button onClick={layerUp} style={{ padding: "8px 12px", borderRadius: 8, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 12, display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>Forward</button>
-            </div>
+            <button onClick={() => { commitSel({ y: canvasSize.h - (selEl.h || 60) }); setActiveFeature(null); toast.success("Moved to Bottom"); }} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><FiArrowDown size={16} /> To Bottom</button>
+            <button onClick={() => { commitSel({ y: 0 }); setActiveFeature(null); toast.success("Moved to Top"); }} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><FiArrowUp size={16} /> To Top</button>
           </div>
-          
-          <div style={{ fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 12, borderTop: "1px solid #e5e7eb", paddingTop: 12 }}>Align on Design</div>
-          
-          <div style={{ display: "flex", gap: 20, marginBottom: 10 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.left} onChange={(e) => setAlignChecks(prev => ({ ...prev, left: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> Left</label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.middle} onChange={(e) => setAlignChecks(prev => ({ ...prev, middle: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> Middle</label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.right} onChange={(e) => setAlignChecks(prev => ({ ...prev, right: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> Right</label>
+          <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+            <button onClick={() => { layerDown(); setActiveFeature(null); toast.success("Moved Backward"); }} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><FiArrowDown size={16} style={{ transform: "rotate(90deg)" }} /> Backward</button>
+            <button onClick={() => { layerUp(); setActiveFeature(null); toast.success("Moved Forward"); }} style={{ flex: 1, padding: "10px 12px", borderRadius: 10, background: "#f3f4f6", border: "none", cursor: "pointer", fontSize: 13, fontWeight: 500, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}><FiArrowUp size={16} style={{ transform: "rotate(90deg)" }} /> Forward</button>
           </div>
-          
-          <div style={{ display: "flex", gap: 20, marginBottom: 10 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.top} onChange={(e) => setAlignChecks(prev => ({ ...prev, top: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> Top</label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.center} onChange={(e) => setAlignChecks(prev => ({ ...prev, center: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> Center</label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.bottom} onChange={(e) => setAlignChecks(prev => ({ ...prev, bottom: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> Bottom</label>
+          <div style={{ borderTop: "1px solid #e5e7eb", marginBottom: 16 }} />
+          <div style={{ fontSize: 13, fontWeight: 600, color: "#333", marginBottom: 12 }}>Align on Design</div>
+          <div style={{ display: "flex", gap: 24, marginBottom: 12, flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.left} onChange={(e) => setAlignChecks(prev => ({ ...prev, left: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> <FiAlignLeft size={14} /> Left</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.middle} onChange={(e) => setAlignChecks(prev => ({ ...prev, middle: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> <FiAlignCenter size={14} /> Middle</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.right} onChange={(e) => setAlignChecks(prev => ({ ...prev, right: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> <FiAlignRight size={14} /> Right</label>
           </div>
-          
-          <div style={{ display: "flex", gap: 20 }}>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.core} onChange={(e) => setAlignChecks(prev => ({ ...prev, core: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> Core</label>
+          <div style={{ display: "flex", gap: 24, marginBottom: 16, flexWrap: "wrap" }}>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.top} onChange={(e) => setAlignChecks(prev => ({ ...prev, top: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> <FiArrowUp size={14} /> Top</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.center} onChange={(e) => setAlignChecks(prev => ({ ...prev, center: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> <FiMove size={14} /> Center</label>
+            <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, cursor: "pointer" }}><input type="checkbox" checked={alignChecks.bottom} onChange={(e) => setAlignChecks(prev => ({ ...prev, bottom: e.target.checked }))} style={{ width: 16, height: 16, cursor: "pointer" }} /> <FiArrowDown size={14} /> Bottom</label>
           </div>
-          
           <button onClick={() => {
             if (alignChecks.left) commitSel({ x: 0 });
             if (alignChecks.middle) commitSel({ x: (canvasSize.w - (selEl.w || 100)) / 2 });
@@ -1872,11 +1906,10 @@ export default function CanvasEditor() {
             if (alignChecks.top) commitSel({ y: 0 });
             if (alignChecks.center) commitSel({ y: (canvasSize.h - (selEl.h || 60)) / 2 });
             if (alignChecks.bottom) commitSel({ y: canvasSize.h - (selEl.h || 60) });
-            if (alignChecks.core) { commitSel({ x: (canvasSize.w - (selEl.w || 100)) / 2, y: (canvasSize.h - (selEl.h || 60)) / 2 }); }
             toast.success("Aligned!");
             setAlignChecks({ left: false, middle: false, right: false, top: false, center: false, bottom: false, core: false });
             setActiveFeature(null);
-          }} style={{ width: "100%", marginTop: 16, padding: 10, background: ACCENT, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>Apply Align</button>
+          }} style={{ width: "100%", padding: 12, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>Apply</button>
         </div>
       );
     }
@@ -1884,27 +1917,11 @@ export default function CanvasEditor() {
     // OUTLINE POPUP
     if (activeFeature === "outline" && selEl && selEl.type === "text") {
       const isOutlineOn = selEl.textOutline === "solid" && selEl.outlineWidth > 0;
-      
       return (
         <div style={popupStyle}>
           <Header title="Outline" />
-          
-          <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 500, marginBottom: 10 }}>Outline</div>
-            <div onClick={() => {
-              if (isOutlineOn) { commitSel({ textOutline: "none", outlineWidth: 0 }); } 
-              else { commitSel({ textOutline: "solid", outlineWidth: 2 }); }
-            }} style={{ width: 50, height: 24, background: isOutlineOn ? ACCENT : "#ccc", borderRadius: 30, position: "relative", cursor: "pointer", transition: "all 0.2s ease" }}>
-              <div style={{ position: "absolute", width: 20, height: 20, background: "#fff", borderRadius: 20, top: 2, left: isOutlineOn ? "calc(100% - 22px)" : "2px", transition: "left 0.2s ease", boxShadow: "0 1px 2px rgba(0,0,0,0.2)" }} />
-            </div>
-          </div>
-          
-          {isOutlineOn && (
-            <div style={{ marginTop: 8 }}>
-              <div style={{ fontSize: 12, marginBottom: 8 }}>Width: {selEl.outlineWidth || 2}px</div>
-              <input type="range" min={1} max={10} step={1} value={selEl.outlineWidth || 2} onChange={e => commitSel({ outlineWidth: +e.target.value, textOutline: "solid" })} style={{ width: "100%" }} />
-            </div>
-          )}
+          <div><div>Outline</div><div onClick={() => { if (isOutlineOn) commitSel({ textOutline: "none", outlineWidth: 0 }); else commitSel({ textOutline: "solid", outlineWidth: 2 }); }} style={{ width: 50, height: 24, background: isOutlineOn ? ACCENT : "#ccc", borderRadius: 30, cursor: "pointer" }}><div style={{ width: 20, height: 20, background: "#fff", borderRadius: 20, transform: isOutlineOn ? "translateX(26px)" : "none" }} /></div></div>
+          {isOutlineOn && <div><div>Width</div><input type="range" min={1} max={10} value={selEl.outlineWidth} onChange={e => commitSel({ outlineWidth: +e.target.value })} /></div>}
         </div>
       );
     }
@@ -1914,64 +1931,37 @@ export default function CanvasEditor() {
       return (
         <div style={popupStyle}>
           <Header title="Fill" />
-          <input type="color" value={selEl.fill === "transparent" ? "#ffffff" : selEl.fill} onChange={e => commitSel({ fill: e.target.value })} style={{ width: "100%", height: 50, borderRadius: 8, border: "1px solid #e5e7eb", marginBottom: 12, cursor: "pointer" }} />
-          <div style={{ display: "flex", gap: 10, justifyContent: "space-between", marginBottom: 12 }}>
-            <div onClick={() => commitSel({ fill: "#FF6B6B" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#FF6B6B", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            <div onClick={() => commitSel({ fill: "#4ECDC4" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#4ECDC4", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            <div onClick={() => commitSel({ fill: "#45B7D1" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#45B7D1", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            <div onClick={() => commitSel({ fill: "#96CEB4" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#96CEB4", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            <div onClick={() => commitSel({ fill: "#FFEAA7" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#FFEAA7", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-          </div>
-          <div style={{ display: "flex", gap: 10, justifyContent: "space-between", marginBottom: 16 }}>
-            <div onClick={() => commitSel({ fill: "#DDA0DD" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#DDA0DD", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            <div onClick={() => commitSel({ fill: "#FFB347" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#FFB347", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            <div onClick={() => commitSel({ fill: "#87CEEB" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#87CEEB", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            <div onClick={() => commitSel({ fill: "#FF69B4" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#FF69B4", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-            <div onClick={() => commitSel({ fill: "#20B2AA" })} style={{ width: 44, height: 44, borderRadius: 10, background: "#20B2AA", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-          </div>
-          <button onClick={() => commitSel({ fill: "transparent" })} style={{ width: "100%", padding: 10, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", fontWeight: 600 }}>Transparent</button>
+          <input type="color" value={selEl.fill === "transparent" ? "#ffffff" : selEl.fill} onChange={e => commitSel({ fill: e.target.value })} style={{ width: "100%", height: 50 }} />
+          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>{COLOR_PRESETS.map(c => <div key={c} onClick={() => commitSel({ fill: c })} style={{ width: 40, height: 40, borderRadius: 8, background: c, cursor: "pointer" }} />)}</div>
+          <button onClick={() => commitSel({ fill: "transparent" })}>Transparent</button>
         </div>
       );
     }
 
-    // Image Size Adjustment Popup
+    // Image Size Popup
     if (activeFeature === "imageSize" && selEl && selEl.type === "image") {
       return (
         <div style={popupStyle}>
           <Header title="Adjust Image Size" />
-          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-            <div>
-              <div style={{ fontSize: 12, marginBottom: 8 }}>Width: {Math.round(selEl.w)}px | Height: {Math.round(selEl.h)}px</div>
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                <FiMinimize size={14} />
-                <input type="range" min={20} max={500} value={selEl.w} onChange={(e) => { const newW = parseInt(e.target.value); const aspectRatio = selEl.w / selEl.h; commitSel({ w: newW, h: newW / aspectRatio }); }} style={{ flex: 1 }} />
-                <FiMaximize size={14} />
-              </div>
-            </div>
-            <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={() => adjustImageSize(100)} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>Reset</button>
-              <button onClick={() => { const newW = selEl.w * 1.2; const aspectRatio = selEl.w / selEl.h; commitSel({ w: newW, h: newW / aspectRatio }); }} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>Enlarge 20%</button>
-              <button onClick={() => { const newW = selEl.w * 0.8; const aspectRatio = selEl.w / selEl.h; commitSel({ w: newW, h: newW / aspectRatio }); }} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>Shrink 20%</button>
-            </div>
-          </div>
+          <div>Width: {Math.round(selEl.w)}px | Height: {Math.round(selEl.h)}px</div>
+          <input type="range" min={20} max={500} value={selEl.w} onChange={(e) => { const newW = parseInt(e.target.value); const aspect = selEl.w / selEl.h; commitSel({ w: newW, h: newW / aspect }); }} />
+          <div><button onClick={() => adjustImageSize(100)}>Reset</button><button onClick={() => { const newW = selEl.w * 1.2; const aspect = selEl.w / selEl.h; commitSel({ w: newW, h: newW / aspect }); }}>Enlarge</button></div>
         </div>
       );
     }
 
-    // Image Shape/Aspect Ratio Adjustment Popup
+    // Image Shape Popup
     if (activeFeature === "imageShape" && selEl && selEl.type === "image") {
       return (
         <div style={popupStyle}>
           <Header title="Adjust Image Shape" />
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8 }}>
-            <button onClick={() => adjustImageShape("original")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}><MdAspectRatio size={18} /><br/>Original</button>
-            <button onClick={() => adjustImageShape("square")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>⬜<br/>Square 1:1</button>
-            <button onClick={() => adjustImageShape("portrait")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>📱<br/>Portrait 3:4</button>
-            <button onClick={() => adjustImageShape("landscape")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>🖥️<br/>Landscape 4:3</button>
-            <button onClick={() => adjustImageShape("circle")} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>⚪<br/>Circle</button>
-            <button onClick={() => { const newW = selEl.h; const newH = selEl.h; commitSel({ w: newW, h: newH, borderRadius: 0 }); }} style={{ padding: 10, borderRadius: 8, background: "#f3f4f6", cursor: "pointer", fontSize: 12 }}>🔲<br/>Equal W/H</button>
+            <button onClick={() => adjustImageShape("original")}>Original</button>
+            <button onClick={() => adjustImageShape("square")}>Square</button>
+            <button onClick={() => adjustImageShape("portrait")}>Portrait</button>
+            <button onClick={() => adjustImageShape("landscape")}>Landscape</button>
+            <button onClick={() => adjustImageShape("circle")}>Circle</button>
           </div>
-          <div style={{ marginTop: 12, padding: 8, background: "#eef2ff", borderRadius: 8, fontSize: 11, textAlign: "center", color: ACCENT }}>Current: {Math.round(selEl.w)} × {Math.round(selEl.h)}</div>
         </div>
       );
     }
@@ -1979,193 +1969,58 @@ export default function CanvasEditor() {
     if (activeFeature === "addText") return (
       <div style={popupStyle}>
         <Header title="Add Text" />
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <textarea value={tText} onChange={e => setTText(e.target.value)} style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10, fontSize: 14, resize: "none", height: 70, boxSizing: "border-box" }} />
-          <select value={tFont} onChange={e => setTFont(e.target.value)} style={{ width: "100%", border: "1px solid #e5e7eb", borderRadius: 8, padding: 8, fontSize: 13 }}>{FONTS.map(f => <option key={f}>{f}</option>)}</select>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 12, color: "#666", width: 50 }}>Size {tSize}</span><input type="range" min={8} max={200} value={tSize} onChange={e => setTSize(+e.target.value)} style={{ flex: 1 }} /></div>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}><span style={{ fontSize: 12, color: "#666" }}>Color</span><input type="color" value={tColor} onChange={e => setTColor(e.target.value)} style={{ width: 40, height: 34, borderRadius: 6, border: "none", cursor: "pointer" }} /></div>
-          <div style={{ display: "flex", gap: 6 }}>
-            {[["B", () => setTBold(!tBold), tBold], ["I", () => setTItalic(!tItalic), tItalic], ["U", () => setTUnderline(!tUnderline), tUnderline]].map(([l, a, on]) => (<button key={l} onClick={a} style={{ flex: 1, padding: 8, borderRadius: 6, border: "none", background: on ? ACCENT : "#f3f4f6", color: on ? "#fff" : "#333", fontWeight: 700, cursor: "pointer" }}>{l}</button>))}
-            <button onClick={() => setTAlign("left")} style={{ flex: 1, padding: 8, borderRadius: 6, border: "none", background: tAlign === "left" ? ACCENT : "#f3f4f6", cursor: "pointer", color: tAlign === "left" ? "#fff" : "#333" }}><FiAlignLeft /></button>
-            <button onClick={() => setTAlign("center")} style={{ flex: 1, padding: 8, borderRadius: 6, border: "none", background: tAlign === "center" ? ACCENT : "#f3f4f6", cursor: "pointer", color: tAlign === "center" ? "#fff" : "#333" }}><FiAlignCenter /></button>
-            <button onClick={() => setTAlign("right")} style={{ flex: 1, padding: 8, borderRadius: 6, border: "none", background: tAlign === "right" ? ACCENT : "#f3f4f6", cursor: "pointer", color: tAlign === "right" ? "#fff" : "#333" }}><FiAlignRight /></button>
-          </div>
-          <button onClick={addText} style={{ padding: 12, background: ACCENT, color: "#fff", border: "none", borderRadius: 10, cursor: "pointer", fontWeight: 600 }}>Add Text to Canvas</button>
-        </div>
-      </div>
-    );
-
-    if (activeFeature === "shapeShadow" && selEl && selEl.type === "shape") return (
-      <div style={popupStyle}>
-        <Header title="Shape Shadow" />
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div><div style={{ fontSize: 12 }}>Shadow Blur</div><input type="range" min={0} max={20} value={selEl.shadow?.blur || 0} onChange={e => commitSel({ shadow: { ...(selEl.shadow || {}), enabled: e.target.value > 0, blur: +e.target.value, color: selEl.shadow?.color || "#000", x: 2, y: 2 } })} style={{ width: "100%" }} /></div>
-          <div><div style={{ fontSize: 12 }}>Shadow Color</div><input type="color" value={selEl.shadow?.color || "#000"} onChange={e => commitSel({ shadow: { ...(selEl.shadow || {}), color: e.target.value, enabled: true } })} style={{ width: "100%", height: 40 }} /></div>
-          <button onClick={() => commitSel({ shadow: { enabled: false, blur: 0, color: "#000", x: 0, y: 0 } })} style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8 }}>Remove Shadow</button>
-        </div>
-      </div>
-    );
-
-    if (activeFeature === "borderRadius" && selEl && selEl.type === "shape") return (
-      <div style={popupStyle}>
-        <Header title="Border Radius" />
-        <input type="range" min={0} max={50} value={selEl.borderRadius || 0} onChange={e => commitSel({ borderRadius: +e.target.value })} style={{ width: "100%" }} />
-        <div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.borderRadius || 0}px</div>
-      </div>
-    );
-
-    if (activeFeature === "blur" && selEl && (selEl.type === "shape" || selEl.type === "image")) return (
-      <div style={popupStyle}>
-        <Header title="Blur Effect" />
-        <input type="range" min={0} max={20} value={selEl.blur || 0} onChange={e => commitSel({ blur: +e.target.value })} style={{ width: "100%" }} />
-        <div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.blur || 0}px</div>
-      </div>
-    );
-
-    if (activeFeature === "imageRadius" && selEl && selEl.type === "image") return (
-      <div style={popupStyle}>
-        <Header title="Border Radius" />
-        <input type="range" min={0} max={100} value={selEl.borderRadius || 0} onChange={e => commitSel({ borderRadius: +e.target.value })} style={{ width: "100%" }} />
-        <div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.borderRadius || 0}px</div>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button onClick={() => commitSel({ borderRadius: 50 })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>Circle (50px)</button>
-          <button onClick={() => commitSel({ borderRadius: 0 })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#f3f4f6", cursor: "pointer" }}>Square</button>
-        </div>
-      </div>
-    );
-
-    if (activeFeature === "imageShadow" && selEl && selEl.type === "image") return (
-      <div style={popupStyle}>
-        <Header title="Image Shadow" />
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <div><div style={{ fontSize: 12 }}>Shadow Blur</div><input type="range" min={0} max={30} value={selEl.shadow?.blur || 0} onChange={e => commitSel({ shadow: { ...(selEl.shadow || {}), enabled: e.target.value > 0, blur: +e.target.value, color: selEl.shadow?.color || "#000", x: 2, y: 2 } })} style={{ width: "100%" }} /></div>
-          <div><div style={{ fontSize: 12 }}>Shadow Color</div><input type="color" value={selEl.shadow?.color || "#000"} onChange={e => commitSel({ shadow: { ...(selEl.shadow || {}), color: e.target.value, enabled: true } })} style={{ width: "100%", height: 40 }} /></div>
-          <button onClick={() => commitSel({ shadow: { enabled: false, blur: 0, color: "#000", x: 0, y: 0 } })} style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8 }}>Remove Shadow</button>
-        </div>
-      </div>
-    );
-
-    if (activeFeature === "imageOpacity" && selEl && selEl.type === "image") return (
-      <div style={popupStyle}>
-        <Header title="Image Opacity" />
-        <input type="range" min={0} max={100} value={selEl.opacity || 100} onChange={e => commitSel({ opacity: +e.target.value })} style={{ width: "100%" }} />
-        <div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.opacity || 100}%</div>
-      </div>
-    );
-
-    if (activeFeature === "changeLang" && selEl && selEl.type === "text") return (
-      <div style={popupStyle}>
-        <Header title="Change Language" />
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 8 }}>
-          <button onClick={() => { const hindiMap = { 'a':'अ','b':'ब','c':'क','d':'द','e':'इ','f':'फ','g':'ग','h':'ह','i':'ई','j':'ज','k':'क','l':'ल','m':'म','n':'न','o':'ओ','p':'प','q':'क','r':'र','s':'स','t':'त','u':'ऊ','v':'व','w':'व','x':'क्स','y':'य','z':'ज',' ':' ' }; commitSel({ text: selEl.text.split('').map(char => hindiMap[char] || char).join('') }); setActiveFeature(null); toast.success("Converted to Hindi"); }} style={{ padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer" }}>हिंदी</button>
-          <button onClick={() => { const englishMap = { 'अ':'a','आ':'aa','इ':'i','ई':'ee','उ':'u','ऊ':'oo','ए':'e','ऐ':'ai','ओ':'o','औ':'au','क':'k','ख':'kh','ग':'g','घ':'gh','च':'ch','छ':'chh','ज':'j','झ':'jh','ट':'t','ठ':'th','ड':'d','ढ':'dh','त':'t','थ':'th','द':'d','ध':'dh','न':'n','प':'p','फ':'ph','ब':'b','भ':'bh','म':'m','य':'y','र':'r','ल':'l','व':'v','श':'sh','ष':'sh','स':'s','ह':'h',' ':' ' }; commitSel({ text: selEl.text.split('').map(char => englishMap[char] || char).join('') }); setActiveFeature(null); toast.success("Converted to English"); }} style={{ padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer" }}>English</button>
-          <button onClick={() => { const urduMap = { 'a':'ا','b':'ب','c':'ک','d':'د','e':'ع','f':'ف','g':'گ','h':'ہ','i':'ی','j':'ج','k':'ک','l':'ل','m':'م','n':'ن','o':'و','p':'پ','q':'ق','r':'ر','s':'س','t':'ت','u':'ا','v':'و','w':'و','x':'کس','y':'ی','z':'ز',' ':' ' }; commitSel({ text: selEl.text.split('').map(char => urduMap[char] || char).join('') }); setActiveFeature(null); toast.success("Converted to Urdu"); }} style={{ padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", background: "#fff", cursor: "pointer" }}>اردو</button>
-        </div>
-      </div>
-    );
-
-    if (activeFeature === "rotate" && selEl) return (
-      <div style={popupStyle}>
-        <Header title="Rotate" />
-        <input type="range" min={0} max={360} value={selEl.rotation || 0} onChange={e => commitSel({ rotation: +e.target.value })} style={{ width: "100%" }} />
-        <div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.rotation || 0}°</div>
-        <div style={{ display: "flex", gap: 8, marginTop: 12 }}>
-          <button onClick={() => commitSel({ rotation: (selEl.rotation || 0) + 90 })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#fff", border: "1px solid #e5e7eb", cursor: "pointer" }}>+90°</button>
-          <button onClick={() => commitSel({ rotation: (selEl.rotation || 0) - 90 })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#fff", border: "1px solid #e5e7eb", cursor: "pointer" }}>-90°</button>
-          <button onClick={() => commitSel({ rotation: 0 })} style={{ flex: 1, padding: 8, borderRadius: 6, background: "#fff", border: "1px solid #e5e7eb", cursor: "pointer" }}>Reset</button>
-        </div>
+        <textarea value={tText} onChange={e => setTText(e.target.value)} style={{ width: "100%", height: 70 }} />
+        <select value={tFont} onChange={e => setTFont(e.target.value)}>{FONTS.map(f => <option key={f}>{f}</option>)}</select>
+        <div><span>Size {tSize}</span><input type="range" min={8} max={200} value={tSize} onChange={e => setTSize(+e.target.value)} /></div>
+        <div><span>Color</span><input type="color" value={tColor} onChange={e => setTColor(e.target.value)} /></div>
+        <div><button onClick={() => setTBold(!tBold)}>B</button><button onClick={() => setTItalic(!tItalic)}>I</button><button onClick={() => setTUnderline(!tUnderline)}>U</button></div>
+        <button onClick={addText}>Add Text</button>
       </div>
     );
 
     if (activeFeature === "font" && selEl) return (
-      <div style={popupStyle}><Header title="Select Font" /><select value={selEl.fontFamily} onChange={e => { commitSel({ fontFamily: e.target.value }); setActiveFeature(null); }} style={{ width: "100%", padding: 12, borderRadius: 10, border: "1px solid #e5e7eb", fontSize: 14 }}>{FONTS.map(f => <option key={f}>{f}</option>)}</select></div>
+      <div style={popupStyle}><Header title="Font" /><select value={selEl.fontFamily} onChange={e => commitSel({ fontFamily: e.target.value })}>{FONTS.map(f => <option key={f}>{f}</option>)}</select></div>
     );
 
-    // Size popup - exactly as you wanted: only (-) number (+) with range slider below
     if (activeFeature === "size" && selEl && selEl.type === "text") return (
       <div style={popupStyle}>
         <Header title="Font Size" />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 20, marginBottom: 16 }}>
-          <button onClick={() => commitSel({ fontSize: Math.max(8, selEl.fontSize - 2) })} style={{ background: "#f3f4f6", border: "none", borderRadius: 10, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 22, fontWeight: 700, color: "#555" }}>−</button>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 80 }}><span style={{ fontSize: 32, fontWeight: 700, color: ACCENT }}>{selEl.fontSize}</span><span style={{ fontSize: 12, color: "#888" }}>px</span></div>
-          <button onClick={() => commitSel({ fontSize: Math.min(200, selEl.fontSize + 2) })} style={{ background: "#f3f4f6", border: "none", borderRadius: 10, width: 44, height: 44, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: 22, fontWeight: 700, color: "#555" }}>+</button>
-        </div>
-        <input type="range" min={8} max={200} value={selEl.fontSize} onChange={e => commitSel({ fontSize: +e.target.value })} style={{ width: "100%" }} />
+        <div><button onClick={() => commitSel({ fontSize: Math.max(8, selEl.fontSize - 2) })}>-</button><span>{selEl.fontSize}</span><button onClick={() => commitSel({ fontSize: Math.min(200, selEl.fontSize + 2) })}>+</button></div>
+        <input type="range" min={8} max={200} value={selEl.fontSize} onChange={e => commitSel({ fontSize: +e.target.value })} />
       </div>
     );
 
-    if (activeFeature === "lineHeight" && selEl) return (
-      <div style={popupStyle}><Header title="Line Height" /><input type="range" min={0.8} max={2.5} step={0.1} value={selEl.lineHeight || 1.3} onChange={e => commitSel({ lineHeight: +e.target.value })} style={{ width: "100%" }} /><div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.lineHeight || 1.3}</div></div>
-    );
-
-    if (activeFeature === "letterSpacing" && selEl) return (
-      <div style={popupStyle}><Header title="Letter Spacing" /><input type="range" min={-2} max={10} value={selEl.letterSpacing || 0} onChange={e => commitSel({ letterSpacing: +e.target.value })} style={{ width: "100%" }} /><div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.letterSpacing || 0}px</div></div>
-    );
-
-    if (activeFeature === "background" && selEl) return (
-      <div style={popupStyle}><Header title="Text Background" /><input type="color" value={selEl.textBackground === "transparent" ? "#ffffff" : selEl.textBackground} onChange={e => commitSel({ textBackground: e.target.value })} style={{ width: "100%", height: 50, borderRadius: 8 }} /><button onClick={() => commitSel({ textBackground: "transparent" })} style={{ marginTop: 10, padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, width: "100%", cursor: "pointer" }}>Remove Background</button></div>
-    );
-
-    if (activeFeature === "animation" && selEl) return (
-      <div style={popupStyle}><Header title="Animation" /><div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 8 }}>{["none", "fadeIn", "slideUp", "bounce", "pulse", "shake", "zoomIn"].map(anim => (<button key={anim} onClick={() => { commitSel({ animation: anim }); setActiveFeature(null); }} style={{ padding: 8, borderRadius: 8, border: "1px solid #e5e7eb", background: selEl.animation === anim ? ACCENT : "#fff", color: selEl.animation === anim ? "#fff" : "#333", cursor: "pointer" }}>{anim}</button>))}</div></div>
-    );
-
-    if (activeFeature === "opacity" && selEl && (selEl.type === "text" || selEl.type === "shape")) return (
-      <div style={popupStyle}><Header title="Opacity" /><input type="range" min={0} max={100} value={selEl.opacity || 100} onChange={e => commitSel({ opacity: +e.target.value })} style={{ width: "100%" }} /><div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.opacity || 100}%</div></div>
-    );
-
-    if (activeFeature === "strokeColor" && selEl) return (
-      <div style={popupStyle}><Header title="Stroke Color" /><input type="color" value={selEl.stroke} onChange={e => commitSel({ stroke: e.target.value })} style={{ width: "100%", height: 50, borderRadius: 8 }} /><div style={{ display: "flex", gap: 8, marginTop: 12, flexWrap: "wrap" }}>
-        <div onClick={() => commitSel({ stroke: "#000000" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#000000", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#FF0000" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#FF0000", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#00FF00" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#00FF00", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#0000FF" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#0000FF", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#FFFF00" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#FFFF00", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#FF00FF" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#FF00FF", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#00FFFF" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#00FFFF", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#FFA500" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#FFA500", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#800080" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#800080", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-        <div onClick={() => commitSel({ stroke: "#FFC0CB" })} style={{ width: 30, height: 30, borderRadius: 15, background: "#FFC0CB", cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />
-      </div></div>
-    );
-
-    if (activeFeature === "strokeWidth" && selEl) return (
-      <div style={popupStyle}><Header title="Stroke Width" /><input type="range" min={0} max={20} value={selEl.strokeW} onChange={e => commitSel({ strokeW: +e.target.value })} style={{ width: "100%" }} /><div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{selEl.strokeW}px</div></div>
-    );
-
-    if (activeFeature === "imageScale" && selEl && selEl.imageSrc) return (
-      <div style={popupStyle}><Header title="Image Scale" /><input type="range" min={0.1} max={3} step={0.01} value={selEl.imageScale || 1} onChange={e => updateShapeImage(selEl.id, { imageScale: +e.target.value })} style={{ width: "100%" }} /><div style={{ textAlign: "center", marginTop: 8 }}>{Math.round((selEl.imageScale || 1) * 100)}%</div></div>
-    );
-
-    if (activeFeature === "imagePosition" && selEl && selEl.imageSrc) return (
-      <div style={popupStyle}><Header title="Image Position" /><div><div style={{ fontSize: 12 }}>X Offset: {(selEl.imagePosition?.x || 0)}px</div><input type="range" min={-100} max={100} value={selEl.imagePosition?.x || 0} onChange={e => updateShapeImage(selEl.id, { imagePosition: { ...(selEl.imagePosition || { x: 0, y: 0 }), x: +e.target.value } })} style={{ width: "100%" }} /></div>
-      <div><div style={{ fontSize: 12 }}>Y Offset: {(selEl.imagePosition?.y || 0)}px</div><input type="range" min={-100} max={100} value={selEl.imagePosition?.y || 0} onChange={e => updateShapeImage(selEl.id, { imagePosition: { ...(selEl.imagePosition || { x: 0, y: 0 }), y: +e.target.value } })} style={{ width: "100%" }} /></div></div>
-    );
-
-    if (activeFeature === "hyperlink" && selEl) return (
-      <div style={popupStyle}><Header title="Hyperlink" /><input type="url" placeholder="https://example.com" value={selEl.hyperlink || ""} onChange={e => commitSel({ hyperlink: e.target.value })} style={{ width: "100%", padding: 10, borderRadius: 8, border: "1px solid #e5e7eb", marginBottom: 10 }} /><button onClick={() => commitSel({ hyperlink: null })} style={{ padding: 8, background: "#f3f4f6", border: "none", borderRadius: 8, cursor: "pointer", width: "100%" }}>Remove Link</button></div>
-    );
-
     if (activeFeature === "bgColor") return (
-      <div style={popupStyle}><Header title="Background Color" /><input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: "100%", height: 50, borderRadius: 8 }} /><div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap" }}>{COLOR_PRESETS.map(c => <div key={c} onClick={() => setBgColor(c)} style={{ width: 30, height: 30, borderRadius: 15, background: c, cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />)}</div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: 8, marginTop: 8 }}>
-        {["#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#FF00FF", "#00FFFF", "#FFA500", "#800080", "#008000", "#FFC0CB"].map(c => (<div key={c} onClick={() => setBgColor(c)} style={{ width: "100%", aspectRatio: "1/1", borderRadius: 8, background: c, cursor: "pointer", border: "2px solid #fff", boxShadow: "0 0 0 1px #ddd" }} />))}
-      </div></div>
+      <div style={popupStyle}>
+        <Header title="Background Color" />
+        <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)} style={{ width: "100%", height: 50 }} />
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 12 }}>{COLOR_PRESETS.map(c => <div key={c} onClick={() => setBgColor(c)} style={{ width: 30, height: 30, borderRadius: 8, background: c, cursor: "pointer" }} />)}</div>
+      </div>
     );
 
     if (activeFeature === "bgOpacity") return (
-      <div style={popupStyle}><Header title="Background Opacity" /><input type="range" min={0} max={100} value={bgOpacity} onChange={e => setBgOpacity(+e.target.value)} style={{ width: "100%" }} /><div style={{ textAlign: "center", marginTop: 8, fontWeight: 700, color: ACCENT }}>{bgOpacity}%</div></div>
+      <div style={popupStyle}>
+        <Header title="Background Opacity" />
+        <input type="range" min={0} max={100} value={bgOpacityCanvas} onChange={e => setBgOpacityCanvas(+e.target.value)} />
+        <div>{bgOpacityCanvas}%</div>
+      </div>
     );
 
     if (activeFeature === "filters") return (
-      <div style={popupStyle}><Header title="Image Filters" /><div><div style={{ fontSize: 12 }}>Brightness: {brightness}%</div><input type="range" min={0} max={200} value={brightness} onChange={e => setBrightness(+e.target.value)} style={{ width: "100%" }} /></div>
-      <div><div style={{ fontSize: 12 }}>Contrast: {contrast}%</div><input type="range" min={0} max={200} value={contrast} onChange={e => setContrast(+e.target.value)} style={{ width: "100%" }} /></div>
-      <div><div style={{ fontSize: 12 }}>Saturation: {saturation}%</div><input type="range" min={0} max={200} value={saturation} onChange={e => setSaturation(+e.target.value)} style={{ width: "100%" }} /></div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 6 }}>{FILTERS_LIST.map(f => <button key={f.name} onClick={() => setFilterPreset(f.value)} style={{ padding: 6, borderRadius: 6, border: "1px solid #e5e7eb", background: filterPreset === f.value ? ACCENT : "#fff", color: filterPreset === f.value ? "#fff" : "#333", cursor: "pointer", fontSize: 11 }}>{f.name}</button>)}</div></div>
+      <div style={popupStyle}>
+        <Header title="Filters" />
+        <div>Brightness <input type="range" min={0} max={200} value={brightness} onChange={e => setBrightness(+e.target.value)} /></div>
+        <div>Contrast <input type="range" min={0} max={200} value={contrast} onChange={e => setContrast(+e.target.value)} /></div>
+        <div>Saturation <input type="range" min={0} max={200} value={saturation} onChange={e => setSaturation(+e.target.value)} /></div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(2,1fr)", gap: 4 }}>{FILTERS_LIST.map(f => <button key={f.name} onClick={() => setFilterPreset(f.value)} style={{ background: filterPreset === f.value ? ACCENT : "#f3f4f6" }}>{f.name}</button>)}</div>
+      </div>
     );
 
     if (activeFeature === "layers") return (
-      <div style={popupStyle}><Header title="Layers" /><div style={{ maxHeight: 300, overflowY: "auto" }}>{[...elements].reverse().map((el, idx) => (<div key={el.id} onClick={() => { setSelId(el.id); setActiveFeature(null); }} style={{ padding: 8, marginBottom: 6, borderRadius: 8, background: selId === el.id ? "#eef2ff" : "#f9fafb", cursor: "pointer", display: "flex", justifyContent: "space-between", alignItems: "center" }}><span style={{ fontSize: 13 }}>{el._label || el.type} {el.type === "text" && `: ${el.text?.substring(0, 20)}`}</span><span style={{ fontSize: 11, color: "#999" }}>Layer {elements.length - idx}</span></div>))}</div></div>
+      <div style={popupStyle}>
+        <Header title="Layers" />
+        <div style={{ maxHeight: 300, overflow: "auto" }}>{[...elements].reverse().map((el, idx) => (<div key={el.id} onClick={() => { setSelId(el.id); setActiveFeature(null); }} style={{ padding: 8, background: selId === el.id ? "#eef2ff" : "#f9fafb", cursor: "pointer" }}>{el._label || el.type} - Layer {elements.length - idx}</div>))}</div>
+      </div>
     );
 
     return null;
@@ -2173,23 +2028,21 @@ export default function CanvasEditor() {
 
   const ImageUploadPopup = () => {
     if (!showImageUploader) return null;
-    return (<><div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 998 }} onClick={() => setShowImageUploader(false)} /><div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "#fff", borderRadius: 16, padding: 24, zIndex: 999, boxShadow: "0 20px 60px rgba(0,0,0,0.3)", minWidth: 300 }}><div style={{ display: "flex", justifyContent: "space-between", marginBottom: 16 }}><h3 style={{ margin: 0 }}>Upload Image for Shape</h3><button onClick={() => setShowImageUploader(false)} style={{ border: "none", background: "none", cursor: "pointer", fontSize: 20 }}>×</button></div><input type="file" accept="image/*" onChange={(e) => { const f = e.target.files[0]; if (f && selectedShapeForImage) { const r = new FileReader(); r.onload = ev => { const el = { id: uid(), type: "shape", shape: selectedShapeForImage, x: 200, y: 200, w: 140, h: 140, fill: "transparent", stroke: sStroke, strokeW: sStrokeW, opacity: 100, rotation: 0, imageSrc: ev.target.result, imageScale: 1, imagePosition: { x: 0, y: 0 }, shadow: { enabled: false, blur: 0, color: "#000", x: 0, y: 0 }, blur: 0, borderRadius: 0 }; commitElements([...elements, el]); setSelId(el.id); setShowImageUploader(false); setSelectedShapeForImage(null); }; r.readAsDataURL(f); } e.target.value = ""; }} style={{ width: "100%", padding: 10, border: "1px solid #e5e7eb", borderRadius: 8 }} /><button onClick={() => setShowImageUploader(false)} style={{ marginTop: 16, width: "100%", padding: 10, background: ACCENT, color: "#fff", border: "none", borderRadius: 8, cursor: "pointer" }}>Cancel</button></div></>);
+    return (<><div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 998 }} onClick={() => setShowImageUploader(false)} /><div style={{ position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)", background: "#fff", borderRadius: 16, padding: 24, zIndex: 999, minWidth: 300 }}><h3>Upload Image for Shape</h3><input type="file" accept="image/*" onChange={(e) => { const f = e.target.files[0]; if (f && selectedShapeForImage) { const r = new FileReader(); r.onload = ev => { const el = { id: uid(), type: "shape", shape: selectedShapeForImage, x: 200, y: 200, w: 140, h: 140, fill: "transparent", stroke: sStroke, strokeW: sStrokeW, opacity: 100, rotation: 0, imageSrc: ev.target.result, imageScale: 1, imagePosition: { x: 0, y: 0 }, shadow: { enabled: false, blur: 0, color: "#000", x: 0, y: 0 }, blur: 0, borderRadius: 0 }; commitElements([...elements, el]); setSelId(el.id); setShowImageUploader(false); setSelectedShapeForImage(null); }; r.readAsDataURL(f); } e.target.value = ""; }} /><button onClick={() => setShowImageUploader(false)}>Cancel</button></div></>);
   };
 
   if (isMobile) {
     return (
       <div style={{ display: "flex", flexDirection: "column", height: "100vh", background: "#e0e0e6", overflow: "hidden" }}>
         <Toaster position="top-center" />
-        {isLoadingData && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ background: "#fff", borderRadius: 20, padding: 32, textAlign: "center" }}><div style={{ fontSize: 40, marginBottom: 16, animation: "spin 1s linear infinite" }}>🎨</div><div style={{ fontSize: 16, fontWeight: 600 }}>Loading Design...</div></div></div>)}
-        <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg,${ACCENT},#ec4899)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700, fontSize: 14, flexShrink: 0 }}>C</div><input value={designTitle} onChange={e => setDesignTitle(e.target.value)} style={{ flex: 1, border: "1px solid #eee", borderRadius: 8, padding: "6px 10px", fontSize: 12, fontWeight: 500, minWidth: 0 }} /><button onClick={undo} disabled={hIdx <= 0} style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #eee", background: "#fff", cursor: "pointer", fontSize: 14 }}>↩</button><button onClick={redo} disabled={hIdx >= history.length - 1} style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #eee", background: "#fff", cursor: "pointer", fontSize: 14 }}>↪</button><button onClick={saveDesignToServer} style={{ padding: "6px 12px", borderRadius: 8, background: `linear-gradient(135deg,${ACCENT},#ec4899)`, color: "#fff", border: "none", fontSize: 12, cursor: "pointer", flexShrink: 0, display: "flex", alignItems: "center", gap: 4 }}><FiSave size={12} /> Save</button></div>
+        {isLoadingData && (<div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ background: "#fff", borderRadius: 20, padding: 32, textAlign: "center" }}><div style={{ fontSize: 40, marginBottom: 16, animation: "spin 1s linear infinite" }}>🎨</div><div>Loading Design...</div></div></div>)}
+        <div style={{ background: "#fff", borderBottom: "1px solid #e5e7eb", padding: "8px 12px", display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}><div style={{ width: 32, height: 32, borderRadius: 8, background: `linear-gradient(135deg,${ACCENT},#ec4899)`, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>C</div><input value={designTitle} onChange={e => setDesignTitle(e.target.value)} style={{ flex: 1, border: "1px solid #eee", borderRadius: 8, padding: "6px 10px", fontSize: 12 }} /><button onClick={undo} disabled={hIdx <= 0} style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #eee", background: "#fff" }}>↩</button><button onClick={redo} disabled={hIdx >= history.length - 1} style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid #eee", background: "#fff" }}>↪</button><button onClick={saveDesignToServer} style={{ padding: "6px 12px", borderRadius: 8, background: `linear-gradient(135deg,${ACCENT},#ec4899)`, color: "#fff", border: "none", fontSize: 12 }}><FiSave size={12} /> Save</button></div>
         <div style={{ flex: 1, overflow: "auto", display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "16px 12px" }}><CanvasArea /></div>
-        <div style={{ position: "fixed", right: 12, bottom: 75, zIndex: 50, display: "flex", flexDirection: "column", gap: 8 }}><button onClick={() => setCanvasZoom(z => Math.min(2, +(z+0.1).toFixed(1)))} style={{ width: 40, height: 40, borderRadius: 40, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><FiZoomIn /></button><button onClick={() => setCanvasZoom(z => Math.max(0.2, +(z-0.1).toFixed(1)))} style={{ width: 40, height: 40, borderRadius: 40, background: "#fff", boxShadow: "0 2px 8px rgba(0,0,0,0.15)", border: "none", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}><FiZoomOut /></button><div style={{ width: 40, height: 40, borderRadius: 40, background: ACCENT, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, fontWeight: 700, boxShadow: "0 2px 8px rgba(0,0,0,0.15)" }}>{Math.round(canvasZoom*100)}%</div></div>
         <input ref={uploadBgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleBgUpload} />
         <input ref={uploadImgRef} type="file" accept="image/*" style={{ display: "none" }} onChange={handleAddImage} />
         <UnifiedMenuBar />
         <FeaturePopup />
         <ImageUploadPopup />
-        <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes popupSlide { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } } @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } } @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } } @keyframes zoomIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } } .animate-fadeIn { animation: fadeIn 0.5s ease; } .animate-slideUp { animation: slideUp 0.5s ease; } .animate-bounce { animation: bounce 0.5s ease; } .animate-pulse { animation: pulse 1s ease-in-out infinite; } .animate-shake { animation: shake 0.5s ease; } .animate-zoomIn { animation: zoomIn 0.5s ease; }`}</style>
       </div>
     );
   }
@@ -2205,7 +2058,24 @@ export default function CanvasEditor() {
       <UnifiedMenuBar />
       <FeaturePopup />
       <ImageUploadPopup />
-      <style>{`@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } } @keyframes popupSlide { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } } @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } } @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } } @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } } @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } } @keyframes zoomIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } } .animate-fadeIn { animation: fadeIn 0.5s ease; } .animate-slideUp { animation: slideUp 0.5s ease; } .animate-bounce { animation: bounce 0.5s ease; } .animate-pulse { animation: pulse 1s ease-in-out infinite; } .animate-shake { animation: shake 0.5s ease; } .animate-zoomIn { animation: zoomIn 0.5s ease; }`}</style>
+      <style>{`
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        @keyframes popupSlide { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.5; } }
+        @keyframes shake { 0%,100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+        @keyframes zoomIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        @keyframes jello { 0%,100% { transform: scale3d(1, 1, 1); } 30% { transform: scale3d(1.25, 0.75, 1); } 40% { transform: scale3d(0.75, 1.25, 1); } 50% { transform: scale3d(1.15, 0.85, 1); } 65% { transform: scale3d(0.95, 1.05, 1); } 75% { transform: scale3d(1.05, 0.95, 1); } }
+        .animate-fadeIn { animation: fadeIn 0.5s ease; }
+        .animate-slideUp { animation: slideUp 0.5s ease; }
+        .animate-bounce { animation: bounce 0.5s ease; }
+        .animate-pulse { animation: pulse 1s ease-in-out infinite; }
+        .animate-shake { animation: shake 0.5s ease; }
+        .animate-zoomIn { animation: zoomIn 0.5s ease; }
+        .animate-jello { animation: jello 0.5s ease; }
+      `}</style>
     </div>
   );
 }
@@ -2217,11 +2087,9 @@ function SelectBox({ el, zoom }) {
   const centerX = w / 2;
   return (
     <div style={{ position: "absolute", left: el.x * zoom, top: el.y * zoom, width: w, height: h, pointerEvents: "none", zIndex: 15 }}>
-      <div style={{ position: "absolute", inset: 0, border: `2px solid ${ACCENT}`, borderRadius: 4, boxShadow: `0 0 0 1px rgba(99,102,241,0.2), 0 0 0 3px rgba(99,102,241,0.1)`, transition: "all 0.2s ease" }} />
-      <div style={{ position: "absolute", inset: -2, border: `1px dashed ${ACCENT}`, borderRadius: 6, opacity: 0.4, animation: "pulse 1.5s ease-in-out infinite" }} />
-      {[{ left: -6, top: -6, cursor: "nw-resize" }, { left: centerX - 6, top: -6, cursor: "n-resize" }, { left: w - 6, top: -6, cursor: "ne-resize" }, { left: w - 6, top: h/2 - 6, cursor: "e-resize" }, { left: w - 6, top: h - 6, cursor: "se-resize" }, { left: centerX - 6, top: h - 6, cursor: "s-resize" }, { left: -6, top: h - 6, cursor: "sw-resize" }, { left: -6, top: h/2 - 6, cursor: "w-resize" }].map((handle, i) => (<div key={i} style={{ position: "absolute", left: handle.left, top: handle.top, width: 12, height: 12, background: "#fff", border: `2px solid ${ACCENT}`, borderRadius: 3, boxShadow: "0 1px 3px rgba(0,0,0,0.15)", cursor: handle.cursor, transition: "transform 0.1s ease, background 0.2s ease" }} />))}
-      <div style={{ position: "absolute", left: centerX - 8, top: -22, width: 16, height: 16, background: ACCENT, borderRadius: "50%", cursor: "grab", boxShadow: "0 2px 4px rgba(0,0,0,0.2)", display: "flex", alignItems: "center", justifyContent: "center", transition: "transform 0.1s ease" }}><FiRotateCw size={10} color="#fff" /></div>
-      <div style={{ position: "absolute", left: centerX - 1, top: -6, width: 2, height: 10, background: ACCENT, opacity: 0.5 }} />
+      <div style={{ position: "absolute", inset: 0, border: `2px solid ${ACCENT}`, borderRadius: 4 }} />
+      {[{ left: -6, top: -6 }, { left: centerX - 6, top: -6 }, { left: w - 6, top: -6 }, { left: w - 6, top: h/2 - 6 }, { left: w - 6, top: h - 6 }, { left: centerX - 6, top: h - 6 }, { left: -6, top: h - 6 }, { left: -6, top: h/2 - 6 }].map((handle, i) => (<div key={i} style={{ position: "absolute", left: handle.left, top: handle.top, width: 12, height: 12, background: "#fff", border: `2px solid ${ACCENT}`, borderRadius: 3 }} />))}
+      <div style={{ position: "absolute", left: centerX - 8, top: -22, width: 16, height: 16, background: ACCENT, borderRadius: "50%", cursor: "grab" }}><FiRotateCw size={10} color="#fff" /></div>
     </div>
   );
 }
@@ -2229,30 +2097,36 @@ function SelectBox({ el, zoom }) {
 function ElView({ el, zoom }) {
   const w = (el.w || el.size || 80) * zoom;
   const h = (el.h || el.size || 80) * zoom;
-  const getAnimClass = () => { const map = { fadeIn: "animate-fadeIn", slideUp: "animate-slideUp", bounce: "animate-bounce", pulse: "animate-pulse", shake: "animate-shake", zoomIn: "animate-zoomIn" }; return map[el.animation] || ""; };
-  const transform = `${el.rotation ? `rotate(${el.rotation}deg)` : ""}${el.scale && el.scale !== 1 ? ` scale(${el.scale})` : ""}`.trim();
-  const base = { position: "absolute", left: el.x * zoom, top: el.y * zoom, width: w, height: h, opacity: (el.opacity ?? 100) / 100, transform: transform || undefined, transformOrigin: "center center", pointerEvents: "auto", cursor: "move" };
-  const shadowStyle = el.shadow?.enabled ? `${el.shadow.x}px ${el.shadow.y}px ${el.shadow.blur}px ${el.shadow.color}` : "none";
-  const blurStyle = el.blur ? `blur(${el.blur}px)` : "none";
+  const getAnimClass = () => { 
+    const map = { 
+      none: "",
+      fade: "animate-fadeIn",
+      fadeIn: "animate-fadeIn", 
+      slideUp: "animate-slideUp", 
+      bounce: "animate-bounce", 
+      pulse: "animate-pulse", 
+      shake: "animate-shake", 
+      zoomIn: "animate-zoomIn",
+      jello: "animate-jello"
+    }; 
+    return map[el.animation] || ""; 
+  };
+  const base = { position: "absolute", left: el.x * zoom, top: el.y * zoom, width: w, height: h, opacity: (el.opacity ?? 100) / 100, transform: el.rotation ? `rotate(${el.rotation}deg)` : undefined, transformOrigin: "center center", pointerEvents: "auto", cursor: "move" };
   const borderRadiusStyle = el.borderRadius ? `${el.borderRadius * zoom}px` : "0px";
+  const bgOpacityNum = el.textBgOpacity !== undefined ? el.textBgOpacity / 100 : 1;
+  const bgRoundnessVal = el.textBgRoundness !== undefined ? el.textBgRoundness * zoom : 0;
 
   if (el.type === "image") {
-    const imgTransform = `${el.rotation ? `rotate(${el.rotation}deg)` : ""}${el.flip ? " scaleX(-1)" : ""}`.trim();
-    return <img src={el.src} alt="" draggable={false} className={getAnimClass()} style={{ ...base, objectFit: "contain", transform: imgTransform || undefined, filter: blurStyle, boxShadow: shadowStyle, borderRadius: borderRadiusStyle }} />;
+    return <img src={el.src} alt="" draggable={false} className={getAnimClass()} style={{ ...base, objectFit: "contain", transform: el.flip ? "scaleX(-1)" : undefined, borderRadius: borderRadiusStyle }} />;
   }
 
   if (el.type === "text") {
-    const textOutlineStyle = el.textOutline === "solid" && el.outlineWidth > 0 ? `${el.outlineWidth * zoom}px ${el.outlineColor}` : "none";
     let textGradient = "";
-    if (el.useGradient && el.gradientColors && el.gradientColors.length >= 2) {
-      if (el.gradientType === "linear") {
-        textGradient = `linear-gradient(135deg, ${el.gradientColors[0]}, ${el.gradientColors[1]})`;
-      } else {
-        textGradient = `radial-gradient(circle, ${el.gradientColors[0]}, ${el.gradientColors[1]})`;
-      }
+    if (el.useGradient && el.gradientColors) {
+      textGradient = el.gradientType === "linear" ? `linear-gradient(135deg, ${el.gradientColors[0]}, ${el.gradientColors[1]})` : `radial-gradient(circle, ${el.gradientColors[0]}, ${el.gradientColors[1]})`;
     }
-    const style = { ...base, color: textGradient ? "transparent" : el.color, background: textGradient ? textGradient : (el.textBackground && el.textBackground !== "transparent" ? el.textBackground : "transparent"), backgroundClip: textGradient ? "text" : "unset", WebkitBackgroundClip: textGradient ? "text" : "unset", fontSize: el.fontSize * zoom, fontFamily: el.fontFamily, fontWeight: el.bold ? 700 : 400, fontStyle: el.italic ? "italic" : "normal", textDecoration: el.underline ? "underline" : "none", textAlign: el.align || "left", whiteSpace: "pre-wrap", lineHeight: el.lineHeight || 1.3, letterSpacing: `${el.letterSpacing || 0}px`, textShadow: el.textShadow && el.textShadow !== "none" ? el.textShadow : "none", WebkitTextStroke: textOutlineStyle !== "none" ? textOutlineStyle : undefined, WebkitTextStrokeWidth: textOutlineStyle !== "none" ? `${el.outlineWidth * zoom}px` : undefined, WebkitTextStrokeColor: textOutlineStyle !== "none" ? el.outlineColor : undefined, display: "flex", alignItems: "center", justifyContent: el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start", borderRadius: 4, padding: "2px 4px" };
-    if (el.hyperlink) return <a href={el.hyperlink} target="_blank" rel="noopener noreferrer" className={getAnimClass()} style={style}>{el.text}</a>;
+    let bgStyle = el.textBackground && el.textBackground !== "transparent" ? el.textBackground : "transparent";
+    const style = { ...base, color: textGradient ? "transparent" : el.color, background: textGradient ? textGradient : bgStyle, backgroundClip: textGradient ? "text" : "unset", WebkitBackgroundClip: textGradient ? "text" : "unset", fontSize: el.fontSize * zoom, fontFamily: el.fontFamily, fontWeight: el.bold ? 700 : 400, fontStyle: el.italic ? "italic" : "normal", textDecoration: el.underline ? "underline" : "none", textAlign: el.align || "left", whiteSpace: "pre-wrap", lineHeight: el.lineHeight || 1.3, letterSpacing: `${el.letterSpacing || 0}px`, textShadow: el.textShadow && el.textShadow !== "none" ? el.textShadow : "none", display: "flex", alignItems: "center", justifyContent: el.align === "center" ? "center" : el.align === "right" ? "flex-end" : "flex-start", borderRadius: bgRoundnessVal, padding: "2px 4px", opacity: bgOpacityNum };
     return <div className={getAnimClass()} style={style}>{el.text}</div>;
   }
 
@@ -2266,9 +2140,9 @@ function ElView({ el, zoom }) {
       const imgH = h * scale;
       const clipX = (w - imgW) / 2 + imgX;
       const clipY = (h - imgH) / 2 + imgY;
-      return (<div className={getAnimClass()} style={{ ...base, overflow: "hidden", position: "absolute", filter: blurStyle, boxShadow: shadowStyle, borderRadius: borderRadiusStyle }}><svg style={{ position: "absolute", top: 0, left: 0, width: w, height: h }}><defs><clipPath id={`clip-${el.id}`}>{el.shape === "rect" && <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} />}{el.shape === "circle" && <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} />}</clipPath></defs><image href={el.imageSrc} x={clipX} y={clipY} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${el.id})`} opacity={el.opacity / 100} />{el.shape === "rect" && <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} fill="none" stroke={el.stroke} strokeWidth={sw} />}{el.shape === "circle" && <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} fill="none" stroke={el.stroke} strokeWidth={sw} />}</svg></div>);
+      return (<div className={getAnimClass()} style={{ ...base, overflow: "hidden", borderRadius: borderRadiusStyle }}><svg style={{ position: "absolute", top: 0, left: 0, width: w, height: h }}><defs><clipPath id={`clip-${el.id}`}>{el.shape === "rect" ? <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} /> : <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} />}</clipPath></defs><image href={el.imageSrc} x={clipX} y={clipY} width={imgW} height={imgH} preserveAspectRatio="xMidYMid slice" clipPath={`url(#clip-${el.id})`} opacity={el.opacity / 100} />{el.shape === "rect" ? <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} fill="none" stroke={el.stroke} strokeWidth={sw} /> : <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} fill="none" stroke={el.stroke} strokeWidth={sw} />}</svg></div>);
     }
-    return (<svg className={getAnimClass()} style={{ ...base, pointerEvents: "auto", cursor: "move", filter: blurStyle, boxShadow: shadowStyle }} viewBox={`0 0 ${w} ${h}`} overflow="visible">{(el.shape === "rect" || el.shape === "image-rect") && <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} fill={el.fill === "transparent" ? "none" : el.fill} stroke={el.stroke} strokeWidth={sw} />}{(el.shape === "circle" || el.shape === "image-circle") && <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} fill={el.fill === "transparent" ? "none" : el.fill} stroke={el.stroke} strokeWidth={sw} />}</svg>);
+    return (<svg className={getAnimClass()} style={{ ...base, pointerEvents: "auto", cursor: "move" }} viewBox={`0 0 ${w} ${h}`}>{(el.shape === "rect" || el.shape === "image-rect") && <rect x={sw/2} y={sw/2} width={w-sw} height={h-sw} rx={el.borderRadius ? el.borderRadius * zoom : 0} fill={el.fill === "transparent" ? "none" : el.fill} stroke={el.stroke} strokeWidth={sw} />}{(el.shape === "circle" || el.shape === "image-circle") && <ellipse cx={w/2} cy={h/2} rx={w/2-sw/2} ry={h/2-sw/2} fill={el.fill === "transparent" ? "none" : el.fill} stroke={el.stroke} strokeWidth={sw} />}</svg>);
   }
   return null;
 }
